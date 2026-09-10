@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Message State Machine — Wireframe</title>
+<style>
+  :root { --gray-50: #fafafa; --gray-100: #f5f5f5; --gray-200: #e5e5e5; --gray-300: #d4d4d4; --gray-400: #a3a3a3; --gray-500: #737373; --gray-600: #525252; --gray-700: #404040; --gray-800: #262626; --gray-900: #171717; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: var(--gray-50); color: var(--gray-800); line-height: 1.5; }
+  .app { max-width: 800px; margin: 0 auto; padding: 24px 16px; }
+  h1 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+  .subtitle { font-size: 13px; color: var(--gray-500); margin-bottom: 24px; }
+
+  /* Tab bar */
+  .tab-bar { display: flex; gap: 0; border-bottom: 2px solid var(--gray-200); margin-bottom: 20px; overflow-x: auto; }
+  .tab-bar button { padding: 10px 20px; font-size: 13px; border: none; background: none; color: var(--gray-500); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; white-space: nowrap; font-family: inherit; }
+  .tab-bar button:hover { color: var(--gray-700); }
+  .tab-bar button.active { color: var(--gray-900); border-bottom-color: var(--gray-700); font-weight: 600; }
+
+  /* Flow indicator */
+  .flow-bar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 10px 0; font-size: 12px; color: var(--gray-500); border-bottom: 1px solid var(--gray-200); margin-bottom: 16px; }
+  .flow-step { padding: 4px 10px; border-radius: 4px; background: var(--gray-100); border: 1px solid var(--gray-200); white-space: nowrap; }
+  .flow-step.current { background: var(--gray-700); color: #fff; border-color: var(--gray-700); }
+  .flow-step.done { background: var(--gray-300); border-color: var(--gray-300); }
+  .flow-step.warn { background: var(--gray-100); border: 1px dashed var(--gray-400); }
+
+  /* Chat area */
+  .chat { border: 1px solid var(--gray-200); border-radius: 8px; background: #fff; overflow: hidden; }
+  .chat-header { padding: 12px 16px; border-bottom: 1px solid var(--gray-200); font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .chat-header .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gray-400); }
+  .chat-body { padding: 16px; min-height: 320px; display: flex; flex-direction: column; gap: 12px; }
+
+  /* Messages */
+  .msg { max-width: 80%; padding: 10px 14px; font-size: 14px; line-height: 1.5; }
+  .msg.user { align-self: flex-end; background: var(--gray-200); border-radius: 16px 16px 4px 16px; }
+  .msg.user.failed { background: var(--gray-100); border: 1px dashed var(--gray-400); }
+  .msg.ai { align-self: flex-start; background: #fff; border: 1px solid var(--gray-200); border-radius: 4px 16px 16px 16px; }
+  .msg-label { font-size: 10px; text-transform: uppercase; color: var(--gray-400); letter-spacing: 0.5px; margin-bottom: 2px; }
+
+  /* AI thinking */
+  .thinking { align-self: flex-start; display: flex; gap: 8px; align-items: center; padding: 12px 16px; border: 1px solid var(--gray-200); border-radius: 4px 16px 16px 16px; background: #fff; }
+  .thinking .dots { display: flex; gap: 4px; }
+  .thinking .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--gray-400); }
+  .thinking .label { font-size: 13px; color: var(--gray-500); }
+
+  /* Source ref */
+  .source { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--gray-100); font-size: 11px; color: var(--gray-500); }
+  .source span { color: var(--gray-600); text-decoration: underline; cursor: pointer; }
+
+  /* Actions row */
+  .actions { display: flex; gap: 12px; padding: 4px 0 4px 40px; }
+  .actions button { font-size: 12px; color: var(--gray-500); background: none; border: none; cursor: pointer; padding: 4px 0; font-family: inherit; }
+  .actions button:hover { color: var(--gray-700); text-decoration: underline; }
+  .actions .tbd { font-size: 9px; color: var(--gray-400); }
+
+  /* Suggested questions */
+  .suggested { margin-top: 4px; padding: 0 0 0 40px; display: flex; flex-direction: column; gap: 4px; }
+  .suggested .sq-title { font-size: 11px; color: var(--gray-500); }
+  .suggested .sq-item { padding: 8px 12px; border: 1px solid var(--gray-200); border-radius: 6px; font-size: 12px; cursor: pointer; background: var(--gray-50); }
+  .suggested .sq-item:hover { background: var(--gray-100); }
+
+  /* Error msg */
+  .error-msg { font-size: 12px; color: var(--gray-600); text-align: center; padding: 8px; }
+  .error-msg .retry { text-decoration: underline; cursor: pointer; }
+
+  /* Offline bar */
+  .offline-bar { background: var(--gray-100); border-bottom: 1px solid var(--gray-300); padding: 8px 16px; font-size: 12px; color: var(--gray-600); text-align: center; display: none; }
+  .offline-bar.show { display: block; }
+
+  /* Input area */
+  .input-area { border-top: 1px solid var(--gray-200); padding: 12px 16px; display: flex; gap: 8px; align-items: center; }
+  .input-area input { flex: 1; padding: 10px 16px; border: 1px solid var(--gray-200); border-radius: 20px; font-size: 14px; outline: none; font-family: inherit; background: var(--gray-50); }
+  .input-area input:focus { border-color: var(--gray-400); background: #fff; }
+  .input-area input:disabled { background: var(--gray-100); color: var(--gray-400); }
+  .input-area button { width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--gray-700); color: #fff; font-size: 16px; cursor: pointer; flex-shrink: 0; }
+  .input-area button:disabled { background: var(--gray-300); cursor: default; }
+
+  /* Annotation */
+  .annotation { font-size: 10px; color: var(--gray-400); margin: 8px 0; padding: 6px 10px; background: var(--gray-50); border-left: 2px solid var(--gray-300); }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    .app { padding: 12px 8px; }
+    .chat-body { padding: 12px; }
+    .msg { max-width: 90%; font-size: 13px; }
+    .tab-bar button { padding: 8px 14px; font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <h1>Message State Machine</h1>
+  <p class="subtitle">Wireframe — grayscale structure review before visual design</p>
+
+  <!-- Flow indicator -->
+  <div class="flow-bar" id="flowBar">
+    <span class="flow-step current">User Sent</span> →
+    <span class="flow-step">AI Waiting</span> →
+    <span class="flow-step">AI Streaming</span> →
+    <span class="flow-step">AI Completed</span> →
+    <span class="flow-step">Suggested Q</span> →
+    <span class="flow-step">Archived</span>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tab-bar" id="tabBar">
+    <button class="active" data-view="normal">Normal Flow</button>
+    <button data-view="failed">Sent → Failed</button>
+    <button data-view="offline">Offline State</button>
+    <button data-view="rapid">Rapid Send</button>
+  </div>
+
+  <!-- Chat container -->
+  <div class="chat">
+    <div class="chat-header"><span class="dot"></span> AI Smart Assistant</div>
+    <div class="offline-bar" id="offlineBar">Network unavailable — check your connection and retry</div>
+    <div class="chat-body" id="chatBody"></div>
+    <div class="input-area">
+      <input type="text" id="chatInput" placeholder="Type your question..." disabled>
+      <button id="sendBtn" disabled>→</button>
+    </div>
+  </div>
+
+  <p class="annotation">Annotation: Color, typography, spacing, and component polish deferred to mockup stage. This wireframe tests the state transition logic and content hierarchy only.</p>
+
+</div>
+
+<script>
+  const body = document.getElementById('chatBody');
+  const input = document.getElementById('chatInput');
+  const send = document.getElementById('sendBtn');
+  const flowBar = document.getElementById('flowBar');
+  const offlineBar = document.getElementById('offlineBar');
+
+  function clear() { body.innerHTML = ''; offlineBar.classList.remove('show'); }
+  function scroll() { body.scrollTop = body.scrollHeight; }
+
+  function userMsg(text, failed) {
+    const d = document.createElement('div');
+    d.className = 'msg user' + (failed ? ' failed' : '');
+    d.innerHTML = '<div class="msg-label">' + (failed ? 'FAILED' : 'SENT') + '</div>' + text;
+    body.appendChild(d); scroll();
+  }
+
+  function aiThinking() {
+    const d = document.createElement('div'); d.className = 'thinking';
+    d.innerHTML = '<div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div><span class="label">AI thinking...</span>';
+    body.appendChild(d); scroll(); return d;
+  }
+
+  function aiMsg(text, withSource, withSuggested) {
+    const d = document.createElement('div'); d.className = 'msg ai';
+    let html = '<div class="msg-label">COMPLETED</div>' + text;
+    if (withSource) html += '<div class="source">Source: <span>Vehicle Manual V3.2</span> &bull; <span>Tech Bulletin 2024-003</span></div>';
+    html += '<div class="annotation">AI-generated, for reference only</div>';
+    d.innerHTML = html;
+    body.appendChild(d);
+
+    if (withSuggested) {
+      const acts = document.createElement('div'); acts.className = 'actions';
+      acts.innerHTML = '<button>👍 Helpful <span class="tbd">[TBD]</span></button><button>👎 Not helpful <span class="tbd">[TBD]</span></button><button>📋 Copy <span class="tbd">[TBD]</span></button><button>🔊 Voice</button>';
+      body.appendChild(acts);
+      const sug = document.createElement('div'); sug.className = 'suggested';
+      sug.innerHTML = '<div class="sq-title">You may also ask:</div><div class="sq-item">Where is the VIN located?</div><div class="sq-item">How to check maintenance records?</div>';
+      body.appendChild(sug);
+    }
+    scroll();
+  }
+
+  function errorMsg(text, retry) {
+    const d = document.createElement('div'); d.className = 'error-msg';
+    d.innerHTML = '⚠ ' + text + (retry ? ' <span class="retry" onclick="normalFlow()">Retry</span>' : '');
+    body.appendChild(d); scroll();
+  }
+
+  // Normal flow
+  function normalFlow() {
+    clear();
+    input.disabled = true; send.disabled = true;
+    input.placeholder = 'AI is thinking...';
+
+    userMsg('What is my VIN code?');
+    flowSteps(['User Sent','AI Waiting','AI Streaming','AI Completed','Suggested Q','Archived'], 0);
+
+    setTimeout(() => { flowSteps(['User Sent','AI Waiting','AI Streaming','AI Completed','Suggested Q','Archived'], 1);
+      const t = aiThinking();
+      setTimeout(() => { flowSteps(['User Sent','AI Waiting','AI Streaming','AI Completed','Suggested Q','Archived'], 3); t.remove(); aiMsg('Your VIN can be found on the lower-left corner of the windshield, on the door frame label of the driver side, and on your vehicle registration document.', true, true); flowSteps(['User Sent','AI Waiting','AI Streaming','AI Completed','Suggested Q','Archived'], 4);
+        input.disabled = false; send.disabled = false; input.placeholder = 'Type your question...';
+      }, 2000);
+    }, 800);
+  }
+
+  // Sent → Failed
+  function failedFlow() {
+    clear();
+    input.disabled = false; send.disabled = false;
+    input.placeholder = 'Type your question...';
+    flowSteps(['Sent','Sent → Failed','Network Off','Recover'], 0);
+    userMsg('What is my VIN code?');
+
+    setTimeout(() => {
+      body.innerHTML = '';
+      flowSteps(['Sent','Sent → Failed','Network Off','Recover'], 1);
+      userMsg('What is my VIN code?', true);
+      errorMsg('Send failed — network disconnected', true);
+    }, 1500);
+  }
+
+  // Offline state
+  function offlineFlow() {
+    clear();
+    input.disabled = true; send.disabled = true;
+    input.placeholder = 'Network unavailable';
+    offlineBar.classList.add('show');
+    flowSteps(['Online','Offline','Frozen','Recovered'], 1);
+    userMsg('Help me check vehicle info');
+    aiMsg('Please provide your VIN code.', false, false);
+
+    setTimeout(() => {
+      flowSteps(['Online','Offline','Frozen','Recovered'], 3);
+      offlineBar.classList.remove('show');
+      input.disabled = false; send.disabled = false;
+      input.placeholder = 'Type your question...';
+    }, 3000);
+  }
+
+  // Rapid send
+  function rapidFlow() {
+    clear();
+    input.disabled = false; send.disabled = false;
+    input.placeholder = 'Type your question...';
+    flowSteps(['Sent x3','AI#1 Wait','AI#1 Done','AI#2 Wait','AI#2 Done','AI#3 Done'], 0);
+
+    const msgs = ['VIN code?', 'Maintenance records?', 'Nearest service?'];
+    msgs.forEach((t, i) => setTimeout(() => userMsg(t), i * 400));
+
+    setTimeout(() => {
+      flowSteps(['Sent x3','AI#1 Wait','AI#1 Done','AI#2 Wait','AI#2 Done','AI#3 Done'], 1);
+      const w = aiThinking();
+      setTimeout(() => { w.remove(); aiMsg('Your VIN is on the windshield lower-left corner.', false, false); flowSteps(['Sent x3','AI#1 Wait','AI#1 Done','AI#2 Wait','AI#2 Done','AI#3 Done'], 2);
+        setTimeout(() => { flowSteps(['Sent x3','AI#1 Wait','AI#1 Done','AI#2 Wait','AI#2 Done','AI#3 Done'], 3); const w2 = aiThinking();
+          setTimeout(() => { w2.remove(); aiMsg('Check maintenance via APP. Recommended every 30,000 km.', false, false); flowSteps(['Sent x3','AI#1 Wait','AI#1 Done','AI#2 Wait','AI#2 Done','AI#3 Done'], 4);
+            setTimeout(() => { flowSteps(['Sent x3','AI#1 Wait','AI#1 Done','AI#2 Wait','AI#2 Done','AI#3 Done'], 5); const w3 = aiThinking();
+              setTimeout(() => { w3.remove(); aiMsg('Nearest service: 1888 Jinqiao Rd, Pudong.', false, false); }, 1200);
+            }, 1000);
+          }, 1200);
+        }, 800);
+      }, 1500);
+    }, 2000);
+  }
+
+  function flowSteps(steps, idx) {
+    flowBar.innerHTML = steps.map((s, i) => {
+      let cls = 'flow-step';
+      if (i < idx) cls += ' done';
+      else if (i === idx) cls += s.includes('Failed') ? ' warn' : ' current';
+      const arrow = i < steps.length - 1 ? ' → ' : '';
+      return '<span class="' + cls + '">' + s + '</span>' + arrow;
+    }).join('');
+  }
+
+  // Tab switching
+  document.getElementById('tabBar').addEventListener('click', e => {
+    if (e.target.tagName !== 'BUTTON') return;
+    document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
+    e.target.classList.add('active');
+    switch (e.target.dataset.view) {
+      case 'normal': normalFlow(); break;
+      case 'failed': failedFlow(); break;
+      case 'offline': offlineFlow(); break;
+      case 'rapid': rapidFlow(); break;
+    }
+  });
+
+  normalFlow();
+</script>
+</body>
+</html>

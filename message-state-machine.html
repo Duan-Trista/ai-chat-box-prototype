@@ -107,10 +107,33 @@
   .flow-step.active { background: #1677FF; color: #FFF; }
   .flow-step.warn { background: #FFF1F0; color: #FF4D4F; }
   .flow-arrow { color: #CCC; }
+
+  /* 密码门 */
+  .pass-gate { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #0d0d0d; }
+  .pass-gate .gate-box { background: #242424; border: 1px solid #3a3530; border-radius: 18px; padding: 40px; text-align: center; max-width: 340px; }
+  .pass-gate .gate-icon { font-size: 48px; margin-bottom: 16px; }
+  .pass-gate .gate-title { font-size: 18px; font-weight: 600; color: #e0d6c8; margin-bottom: 8px; }
+  .pass-gate .gate-desc { font-size: 13px; color: #9a8e7e; margin-bottom: 24px; }
+  .pass-gate .gate-input { width: 100%; padding: 12px 16px; border-radius: 12px; border: 1px solid #3a3530; background: #2a2a2a; color: #e0d6c8; font-size: 14px; text-align: center; outline: none; margin-bottom: 16px; }
+  .pass-gate .gate-input:focus { border-color: hsla(31,84%,83%,1); }
+  .pass-gate .gate-btn { width: 100%; padding: 12px; border-radius: 12px; background: hsla(31,84%,83%,1); color: #1a1a1a; border: none; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .pass-gate .gate-btn:hover { background: hsla(31,70%,60%,1); }
+  .pass-gate .gate-error { font-size: 12px; color: #c0392b; margin-top: 8px; display: none; }
+  .pass-gate .gate-error.show { display: block; }
 </style>
 </head>
 <body>
-
+<div class="pass-gate" id="passGate">
+  <div class="gate-box">
+    <div class="gate-icon">🔒</div>
+    <div class="gate-title">消息状态机原型</div>
+    <div class="gate-desc">请输入访问密码</div>
+    <input type="password" class="gate-input" id="passInput" placeholder="输入密码" onkeydown="if(event.key==='Enter')checkPass()">
+    <button class="gate-btn" onclick="checkPass()">进入</button>
+    <div class="gate-error" id="passError">密码错误</div>
+  </div>
+</div>
+<div id="mainApp" style="display:none">
 <h1>消息状态机原型（User + AI 统一）</h1>
 
 <div class="section-label">正常流转</div>
@@ -400,6 +423,10 @@
   M.tabsOffline.addEventListener('click', e => { if (e.target.classList.contains('tab')) { deactivateAll(); e.target.classList.add('active'); switch (e.target.dataset.state) { case 'offline-send': demoOfflineSend(); break; case 'offline-idle': demoOfflineIdle(); break; case 'offline-recover': demoOfflineRecover(); break; } } });
 
   demoFlowFull();
+  // 密码验证
+  function checkPass(){var pw=document.getElementById('passInput').value;if(pw==='scania2026'){document.getElementById('passGate').style.display='none';document.getElementById('mainApp').style.display='block';sessionStorage.setItem('smPass','1');}else{document.getElementById('passError').classList.add('show');}}
+  if(sessionStorage.getItem('smPass')==='1'){document.getElementById('passGate').style.display='none';document.getElementById('mainApp').style.display='block';}
 </script>
+</div>
 </body>
 </html>

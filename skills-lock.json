@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "html-wireframe": {
+      "source": "plannotator/effective-html",
+      "sourceType": "github",
+      "skillPath": "skills/html-wireframe/SKILL.md",
+      "computedHash": "04a0317e209c63a9bda3a7a68cf61c55c0de1585fc8784e8df127d60b836719f"
+    }
+  }
+}

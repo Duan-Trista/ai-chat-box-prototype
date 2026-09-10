@@ -494,7 +494,7 @@ var streamTimer=null,streamIdx=0;
 var streamFullText='方向盘调节步骤如下：\n\n1. 找到方向盘下方的调节杆\n2. 向下推动调节杆解锁\n3. 调整方向盘到合适的高度和角度\n4. 向上拉回调节杆锁定位置\n\n推荐：方向盘上沿与肩膀齐平，手臂自然弯曲约120度。\n\n安全提示：请勿在行驶中调节方向盘。';
 function startStream(){var think=document.getElementById('streamThink'),status=document.getElementById('thinkStatus'),answer=document.getElementById('streamAnswer'),bubble=document.getElementById('streamBubble'),actions=document.getElementById('streamActions'),sendBtn=document.getElementById('sendBtnStream');think.style.display='flex';answer.style.display='none';actions.style.display='none';sendBtn.textContent='⏹';sendBtn.onclick=stopStreamingFull;sendBtn.disabled=false;status.textContent='正在查找车书...';streamIdx=0;bubble.innerHTML='<span class="streaming-cursor" id="streamCursor"></span>';clearTimeout(streamTimer);streamTimer=setTimeout(function(){status.textContent='正在组织答案...';streamTimer=setTimeout(function(){think.style.display='none';answer.style.display='flex';actions.style.display='flex';streamTimer=setInterval(streamChar,60);},800);},1000);}
 function streamChar(){var bubble=document.getElementById('streamBubble');if(streamIdx<streamFullText.length){streamIdx++;bubble.innerHTML=streamFullText.substring(0,streamIdx).replace(/\n/g,'<br>')+'<span class="streaming-cursor" id="streamCursor"></span>';document.getElementById('streamBody').scrollTop=document.getElementById('streamBody').scrollHeight;}else{clearTimeout(streamTimer);bubble.innerHTML=streamFullText.replace(/\n/g,'<br>')+'<div class="disclaimer">内容由AI生成，仅供参考</div>';var sendBtn=document.getElementById('sendBtnStream');sendBtn.textContent='→';sendBtn.onclick=function(){sendFromUI('inputStream');};sendBtn.disabled=true;}}
-function stopStreamingFull(){clearTimeout(streamTimer);document.getElementById('streamThink').style.display='none';var bubble=document.getElementById('streamBubble'),answer=document.getElementById('streamAnswer'),actions=document.getElementById('streamActions'),sendBtn=document.getElementById('sendBtnStream');sendBtn.textContent='→';sendBtn.onclick=function(){sendFromUI('inputStream');};sendBtn.disabled=true;if(streamIdx>0){answer.style.display='flex';actions.style.display='flex';bubble.innerHTML=streamFullText.substring(0,streamIdx).replace(/\n/g,'<br>')+'<div class="disclaimer">内容由AI生成，仅供参考</div>';}else{answer.style.display='none';actions.style.display='none';}toast('已停止生成');}
+function stopStreamingFull(){clearTimeout(streamTimer);document.getElementById('streamThink').style.display='none';var bubble=document.getElementById('streamBubble'),answer=document.getElementById('streamAnswer'),actions=document.getElementById('streamActions'),sendBtn=document.getElementById('sendBtnStream');sendBtn.textContent='→';sendBtn.onclick=function(){sendFromUI('inputStream');};sendBtn.disabled=true;if(streamIdx>0){answer.style.display='flex';actions.style.display='flex';var wasComplete=(streamIdx>=streamFullText.length);bubble.innerHTML=streamFullText.substring(0,streamIdx).replace(/\n/g,'<br>')+(wasComplete?'<div class="disclaimer">内容由AI生成，仅供参考</div>':'<div class="disclaimer" style="color:var(--danger);border-top:1px dashed rgba(200,80,30,0.3);padding-top:8px;margin-top:8px">⚠ 回复已中断</div>');}else{answer.style.display='none';actions.style.display='none';}toast(streamIdx>=streamFullText.length?'已停止生成':'回复已中断');}
 function stopStream(){clearTimeout(streamTimer);var t=document.getElementById('streamThink');if(t)t.style.display='none';var sendBtn=document.getElementById('sendBtnStream');if(sendBtn){sendBtn.textContent='→';sendBtn.onclick=function(){sendFromUI('inputStream');};sendBtn.disabled=true;}}
 var streamStarted=false;
 document.querySelector('[data-screen="chat-qa-streaming"]').addEventListener('click',function(){if(!streamStarted){streamStarted=true;startStream();}});
@@ -667,20 +667,34 @@ function toggleOffline(){document.querySelectorAll('.offline-banner').forEach(fu
   // === 连续快速发送（含 AI 串行回复） ===
   function demoRapid(){
     reset();setAIThinking(true);banner.style.display='block';
-    banner.innerHTML='<strong>连续快速发送：</strong>用户在第1条触发 AI 前连发3条 → 3条均展示为 Sent → AI 串行处理 → 每条后跟 Waiting→Streaming→Completed。';
-    setFlow(['Sent×3','AI#1 Wait','AI#1 Stream','AI#1 Done','AI#2 Wait','AI#2 Stream','AI#2 Done','AI#3 Wait','AI#3 Stream','AI#3 Done'],0);
-    var msgs=['我的VIN码是多少？','帮我查一下保养记录','最近的维修站在哪？'];
-    var replies=['您的VIN码可以在前挡风玻璃左下角、驾驶座车门内侧铭牌以及车辆行驶证上找到。','保养记录可通过Scania Connect APP或授权服务站查询，建议每3万公里进行一次常规保养。','最近的授权服务站在上海市浦东新区金桥路1888号，联系电话021-xxxx-xxxx。'];
-    // 快速发送3条
-    var si=0;msgs.forEach(function(t,i){later(function(){addUser('sent',t);setFlow(['Sent×3','AI#1 Wait','AI#1 Stream','AI#1 Done','AI#2 Wait','AI#2 Stream','AI#2 Done','AI#3 Wait','AI#3 Stream','AI#3 Done'],i);},i*400);});
-    // AI 串行回复，每条间隔3s
-    function aiReply(idx){
-      if(idx>=3){setAIThinking(false);return;}
-      var fi=1+idx*3;
-      later(function(){setFlow(['Sent×3','AI#1 Wait','AI#1 Stream','AI#1 Done','AI#2 Wait','AI#2 Stream','AI#2 Done','AI#3 Wait','AI#3 Stream','AI#3 Done'],fi);var w=addWaiting();},1200+idx*3500);
-      later(function(){setFlow(['Sent×3','AI#1 Wait','AI#1 Stream','AI#1 Done','AI#2 Wait','AI#2 Stream','AI#2 Done','AI#3 Wait','AI#3 Stream','AI#3 Done'],fi+1);var w=document.getElementById('smWaiting');if(w)w.remove();addStream(replies[idx],function(d){later(function(){setFlow(['Sent×3','AI#1 Wait','AI#1 Stream','AI#1 Done','AI#2 Wait','AI#2 Stream','AI#2 Done','AI#3 Wait','AI#3 Stream','AI#3 Done'],fi+2);d.remove();addCompleted(replies[idx],idx===2);if(idx<2)aiReply(idx+1);else setAIThinking(false);},600);});},2200+idx*3500);
-    }
-    later(function(){aiReply(0);},2000);
+    banner.innerHTML='<strong>连续快速发送：</strong>用户连发3条 → 每条新消息中断前一条 AI 回答 → 仅回复最新消息 → 前两条显示"回复已中断"。';
+    setFlow(['Sent#1','Sent#2(中断AI#1)','Sent#3(中断AI#2)','AI#3 Wait','AI#3 Stream','AI#3 Done'],0);
+    var msgs=['消息1：我的VIN码是多少？','消息2：帮我查一下保养记录','消息3：最近的维修站在哪？'];
+    var partial=['您的VIN码可以在前挡风玻璃左下角、驾驶座','保养记录可通过Scania Connect APP或'];
+    var full='最近的授权服务站在上海市浦东新区金桥路1888号，联系电话021-xxxx-xxxx。';
+    var si=0;msgs.forEach(function(t,i){later(function(){addUser('sent',t);},i*400);});
+    // 消息1 发出 → AI开始回答
+    later(function(){setFlow(['Sent#1','Sent#2(中断AI#1)','Sent#3(中断AI#2)','AI#3 Wait','AI#3 Stream','AI#3 Done'],0);var w=addWaiting();},600);
+    // 消息1 streaming 部分内容
+    later(function(){setFlow(['Sent#1','Sent#2(中断AI#1)','Sent#3(中断AI#2)','AI#3 Wait','AI#3 Stream','AI#3 Done'],0);var w=document.getElementById('smWaiting');if(w)w.remove();addStream(partial[0],function(d){d.remove();});},1200);
+    // 消息2 发出 → 中断AI#1
+    later(function(){setFlow(['Sent#1','Sent#2(中断AI#1)','Sent#3(中断AI#2)','AI#3 Wait','AI#3 Stream','AI#3 Done'],1);
+      // 在chat中插入中断标记
+      var d=document.createElement('div');d.className='ai-row';d.innerHTML='<div class="ai-avatar">🤖</div><div class="ai-col"><div class="ai-name">卡车助手</div><div class="ai-bubble">'+partial[0]+'<div class="disclaimer" style="color:var(--danger);border-top:1px dashed rgba(200,80,30,0.3);padding-top:6px;margin-top:6px">⚠ 回复已中断</div></div></div>';
+      chat.appendChild(d);scroll();
+      // 开始AI#2
+      var w=addWaiting();
+      later(function(){var w2=document.getElementById('smWaiting');if(w2)w2.remove();addStream(partial[1],function(d){d.remove();});},800);
+    },2000);
+    // 消息3 发出 → 中断AI#2
+    later(function(){setFlow(['Sent#1','Sent#2(中断AI#1)','Sent#3(中断AI#2)','AI#3 Wait','AI#3 Stream','AI#3 Done'],2);
+      var d=document.createElement('div');d.className='ai-row';d.innerHTML='<div class="ai-avatar">🤖</div><div class="ai-col"><div class="ai-name">卡车助手</div><div class="ai-bubble">'+partial[1]+'<div class="disclaimer" style="color:var(--danger);border-top:1px dashed rgba(200,80,30,0.3);padding-top:6px;margin-top:6px">⚠ 回复已中断</div></div></div>';
+      chat.appendChild(d);scroll();
+      // 开始AI#3（最新消息，完整回复）
+      var w=addWaiting();
+      later(function(){setFlow(['Sent#1','Sent#2(中断AI#1)','Sent#3(中断AI#2)','AI#3 Wait','AI#3 Stream','AI#3 Done'],3);},500);
+      later(function(){setFlow(['Sent#1','Sent#2(中断AI#1)','Sent#3(中断AI#2)','AI#3 Wait','AI#3 Stream','AI#3 Done'],4);var w3=document.getElementById('smWaiting');if(w3)w3.remove();addStream(full,function(d){later(function(){setFlow(['Sent#1','Sent#2(中断AI#1)','Sent#3(中断AI#2)','AI#3 Wait','AI#3 Stream','AI#3 Done'],5);d.remove();setAIThinking(false);addCompleted(full,true);banner.innerHTML='<strong>连续快速发送：</strong>闭环完成。仅回复最新消息，前2条被中断。';},600);});},2000);
+    },3600);
   }
   // === Failed 后编辑 → AI 回复闭环 ===
   function demoEdit(){

@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Chat Box - 原型 MVP1</title>
+<style>
+:root { --gold: hsla(31, 84%, 83%, 1); --gold-dark: hsla(31, 70%, 60%, 1); --bg: #1a1a1a; --bg-card: #242424; --bg-input: #2a2a2a; --text: #e0d6c8; --text-secondary: #9a8e7e; --border: #3a3530; --danger: #c0392b; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif; background: #0d0d0d; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; padding: 20px; gap: 0; }
+.password-gate { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+.password-gate .gate-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: 18px; padding: 40px; text-align: center; max-width: 340px; }
+.password-gate .gate-box .gate-icon { font-size: 48px; margin-bottom: 16px; }
+.password-gate .gate-box .gate-title { font-size: 18px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+.password-gate .gate-box .gate-desc { font-size: 13px; color: var(--text-secondary); margin-bottom: 24px; }
+.password-gate .gate-box .gate-input { width: 100%; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-input); color: var(--text); font-size: 14px; text-align: center; outline: none; margin-bottom: 16px; }
+.password-gate .gate-box .gate-input:focus { border-color: var(--gold); }
+.password-gate .gate-box .gate-btn { width: 100%; padding: 12px; border-radius: 12px; background: var(--gold); color: #1a1a1a; border: none; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+.password-gate .gate-box .gate-btn:hover { background: var(--gold-dark); }
+.password-gate .gate-box .gate-error { font-size: 12px; color: var(--danger); margin-top: 8px; display: none; }
+.password-gate .gate-box .gate-error.show { display: block; }
+.layout-left { width: 200px; flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; position: sticky; top: 20px; max-height: 90vh; overflow-y: auto; }
+.side-nav { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 8px; display: flex; flex-direction: column; gap: 2px; }
+.side-nav-item { padding: 10px 14px; font-size: 13px; color: var(--text-secondary); cursor: pointer; border-radius: 8px; transition: all 0.2s; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+.side-nav-item:hover { color: var(--text); background: var(--bg-input); }
+.side-nav-item.active { color: var(--gold); background: rgba(31, 100%, 83%, 0.08); font-weight: 600; }
+.side-nav-item .expand-icon { font-size: 10px; margin-left: auto; transition: transform 0.2s; }
+.side-nav-item.expanded .expand-icon { transform: rotate(90deg); }
+.side-nav-divider { height: 1px; background: var(--border); margin: 6px 8px; }
+.sub-nav { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 8px; display: none; flex-direction: column; gap: 2px; margin-top: 4px; }
+.sub-nav.show { display: flex; }
+.sub-nav-item { padding: 8px 14px 8px 28px; font-size: 12px; color: var(--text-secondary); cursor: pointer; border-radius: 8px; transition: all 0.2s; white-space: nowrap; }
+.sub-nav-item:hover { color: var(--text); background: var(--bg-input); }
+.sub-nav-item.active { color: var(--gold); }
+.phone-wrap { display: flex; gap: 16px; align-items: flex-start; margin-left: 16px; }
+.phone { width: 390px; height: 844px; background: var(--bg); border-radius: 40px; overflow: hidden; position: relative; box-shadow: 0 0 40px rgba(0,0,0,0.5), 0 0 0 3px #333; flex-shrink: 0; }
+.phone-inner { height: 100%; display: flex; flex-direction: column; }
+.screen { flex: 1; overflow-y: auto; display: none; }
+.screen.active { display: flex; flex-direction: column; }
+.header { background: var(--bg-card); padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.header .back { font-size: 18px; color: var(--text); cursor: pointer; background: none; border: none; flex-shrink: 0; }
+.header .center { font-size: 14px; color: var(--text); font-weight: 600; flex: 1; }
+.header .header-right-group { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.header .right { font-size: 13px; color: var(--gold); cursor: pointer; background: none; border: none; }
+.header .right.danger { color: var(--danger); }
+.header .auto-voice-btn { font-size: 16px; cursor: pointer; background: none; border: none; color: var(--text-secondary); transition: all 0.2s; }
+.header .auto-voice-btn.on { color: var(--gold); }
+.offline-banner { background: rgba(200, 80, 30, 0.15); border-bottom: 1px solid rgba(200, 80, 30, 0.3); padding: 8px 16px; text-align: center; font-size: 12px; color: var(--gold); flex-shrink: 0; display: none; }
+.offline-banner.show { display: block; }
+.chat-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 6px; scroll-behavior: smooth; }
+.chat-input-area { background: var(--bg-card); border-top: 1px solid var(--border); padding: 10px 16px; display: flex; align-items: flex-end; gap: 8px; padding-bottom: 22px; flex-shrink: 0; position: relative; }
+.chat-input { flex: 1; border: 1px solid var(--border); border-radius: 20px; padding: 10px 16px; font-size: 14px; outline: none; resize: none; max-height: 100px; background: var(--bg-input); color: var(--text); }
+.chat-input::placeholder { color: var(--text-secondary); }
+.chat-input:focus { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(31, 100%, 83%, 0.2); }
+.send-btn { width: 36px; height: 36px; border-radius: 50%; background: var(--gold); border: none; color: #1a1a1a; font-size: 16px; font-weight: 700; cursor: pointer; flex-shrink: 0; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
+.send-btn:disabled { background: #3a3530; color: #666; cursor: default; }
+.send-btn:hover:not(:disabled) { background: var(--gold-dark); }
+
+.ai-row { display: flex; gap: 8px; align-items: flex-start; margin: 4px 0; }
+.ai-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--gold); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+.ai-col { flex: 1; min-width: 0; }
+.ai-name { font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; padding-left: 2px; }
+.ai-bubble { background: var(--bg-card); color: var(--text); padding: 10px 14px; border-radius: 4px 18px 18px 18px; font-size: 14px; line-height: 1.6; border: 1px solid var(--border); position: relative; }
+.ai-bubble .disclaimer { font-size: 11px; color: var(--text-secondary); margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+.ai-link { color: var(--gold); text-decoration: underline; cursor: pointer; }
+.ai-img { max-width: 100%; border-radius: 10px; margin: 8px 0; border: 1px solid var(--border); }
+.img-fail { display: flex; align-items: center; gap: 8px; padding: 12px; background: var(--bg-input); border-radius: 10px; border: 1px dashed var(--border); margin: 8px 0; }
+.art-expand { background: var(--bg-input); border: 1px solid var(--border); border-radius: 10px; margin-top: 8px; padding: 12px; display: none; }
+.art-expand .art-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+.art-expand .art-content { font-size: 13px; color: var(--text-secondary); line-height: 1.7; }
+.art-expand .art-close { font-size: 12px; color: var(--gold); cursor: pointer; margin-top: 8px; display: inline-block; }
+.voice-inline { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+.voice-inline .v-status { font-size: 12px; color: var(--text-secondary); flex: 1; }
+.voice-inline .v-btn { width: 30px; height: 30px; border-radius: 50%; background: var(--gold); color: #1a1a1a; border: none; cursor: pointer; font-size: 13px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+.voice-inline .v-btn:hover { background: var(--gold-dark); }
+.voice-inline .v-btn.stop { background: var(--danger); color: #fff; }
+.msg-system { text-align: center; margin: 10px 0; font-size: 12px; color: var(--text-secondary); padding: 4px 0; }
+.user-msg { display: flex; justify-content: flex-end; margin: 4px 0; }
+.user-msg .bubble { background: var(--gold); color: #1a1a1a; padding: 10px 14px; border-radius: 18px 18px 4px 18px; max-width: 78%; font-size: 14px; line-height: 1.5; }
+.user-msg .bubble.sending { opacity: 0.6; }
+.user-msg .bubble.failed { background: #3a3530; color: var(--text-secondary); }
+.streaming-cursor { display: inline-block; width: 2px; height: 14px; background: var(--gold); animation: blink 0.8s infinite; vertical-align: middle; margin-left: 2px; }
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+.msg-actions { display: flex; gap: 12px; padding: 8px 0 4px 40px; flex-wrap: wrap; }
+.msg-action { font-size: 12px; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; gap: 4px; background: none; border: none; transition: all 0.2s; padding: 4px 0; }
+.msg-action:hover { color: var(--gold); }
+.msg-action.active { color: var(--gold); font-weight: 600; }
+.welcome-area { text-align: center; padding: 30px 0 16px; }
+.welcome-area .robot-icon { font-size: 48px; margin-bottom: 10px; }
+.welcome-area .welcome-text { font-size: 17px; font-weight: 600; color: var(--text); }
+.welcome-cards { display: flex; gap: 8px; overflow-x: auto; padding: 0 0 10px; scrollbar-width: none; }
+.welcome-cards::-webkit-scrollbar { display: none; }
+.welcome-card { flex-shrink: 0; background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 12px 16px; font-size: 13px; color: var(--text); cursor: pointer; white-space: nowrap; transition: all 0.2s; }
+.welcome-card:hover { border-color: var(--gold); background: #2a2820; }
+.keyword-row { display: flex; gap: 6px; padding: 6px 16px; overflow-x: auto; scrollbar-width: none; flex-shrink: 0; background: var(--bg); }
+.keyword-row::-webkit-scrollbar { display: none; }
+.keyword-tag { flex-shrink: 0; padding: 6px 14px; border-radius: 16px; background: rgba(31, 100%, 83%, 0.08); color: var(--gold); font-size: 12px; cursor: pointer; border: 1px solid rgba(31, 100%, 83%, 0.2); white-space: nowrap; transition: all 0.2s; }
+.keyword-tag:hover { background: rgba(31, 100%, 83%, 0.15); }
+.faq-module { border: 1px solid var(--border); border-radius: 14px; background: var(--bg-card); overflow: hidden; margin-top: 8px; }
+.faq-module-header { padding: 10px 14px; font-size: 12px; color: var(--text-secondary); border-bottom: 1px solid var(--border); background: rgba(31, 100%, 83%, 0.04); }
+.faq-session-tabs { display: flex; gap: 4px; padding: 8px 12px; overflow-x: auto; scrollbar-width: none; }
+.faq-session-tab { padding: 6px 16px; border-radius: 16px; font-size: 12px; white-space: nowrap; cursor: pointer; background: var(--bg-input); color: var(--text-secondary); border: 1px solid var(--border); transition: all 0.2s; }
+.faq-session-tab.active { background: var(--gold); color: #1a1a1a; border-color: var(--gold); font-weight: 600; }
+.faq-session-tab:hover:not(.active) { border-color: var(--gold); }
+.faq-panel { display: none; flex-direction: column; gap: 4px; padding: 8px 12px 12px; }
+.faq-panel.active { display: flex; }
+.faq-item { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--bg-input); border-radius: 8px; font-size: 13px; color: var(--text); cursor: pointer; transition: all 0.2s; }
+.faq-item:hover { background: #2a2820; }
+.faq-item .icon { width: 20px; height: 20px; border-radius: 50%; background: rgba(31, 100%, 83%, 0.15); display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--gold); flex-shrink: 0; }
+.think-row { display: flex; gap: 8px; align-items: flex-start; margin: 4px 0; }
+.think-row .ai-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--gold); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+.think-box { padding: 12px 16px; background: var(--bg-card); border-radius: 4px 18px 18px 18px; border: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+.think-box .dots { display: flex; gap: 4px; }
+.think-box .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-secondary); animation: bounce 1.4s infinite; }
+.think-box .dot:nth-child(2) { animation-delay: 0.2s; }
+.think-box .dot:nth-child(3) { animation-delay: 0.4s; }
+.think-box .think-status { font-size: 12px; color: var(--text-secondary); }
+@keyframes bounce { 0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; } 40% { transform: scale(1); opacity: 1; } }
+.reject-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+.reject-box .text { font-size: 14px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 12px; }
+.reject-box .suggestions { display: flex; flex-direction: column; gap: 6px; }
+.reject-box .suggestion { padding: 10px 14px; background: rgba(31, 100%, 83%, 0.06); border: 1px solid rgba(31, 100%, 83%, 0.15); border-radius: 10px; font-size: 13px; color: var(--gold); cursor: pointer; transition: all 0.2s; }
+.reject-box .suggestion:hover { background: rgba(31, 100%, 83%, 0.12); }
+.escalation { background: rgba(200, 80, 30, 0.1); border: 1px solid rgba(200, 80, 30, 0.2); border-radius: 14px; padding: 16px; margin: 8px 0; }
+.escalation .esc-title { font-size: 14px; font-weight: 600; color: var(--gold); margin-bottom: 8px; }
+.escalation .esc-text { font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 10px; }
+.escalation .esc-phone { display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: var(--gold); color: #1a1a1a; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; width: fit-content; }
+.error-msg { text-align: center; font-size: 13px; color: var(--text-secondary); padding: 14px; }
+.error-msg .retry { color: var(--gold); cursor: pointer; font-weight: 500; }
+.vehicle-picker { position: absolute; top: 50px; left: 12px; right: 12px; background: var(--bg-card); border-radius: 14px; box-shadow: 0 6px 24px rgba(0,0,0,0.4); z-index: 100; padding: 8px; border: 1px solid var(--border); }
+.vehicle-picker .item { padding: 12px 16px; font-size: 13px; color: var(--text); cursor: pointer; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; transition: background 0.15s; }
+.vehicle-picker .item:hover { background: var(--bg-input); }
+.vehicle-picker .item .check { color: var(--gold); font-weight: 600; }
+.modal-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 200; display: flex; align-items: center; justify-content: center; }
+.modal { background: var(--bg-card); border-radius: 18px; padding: 24px; margin: 24px; text-align: center; border: 1px solid var(--border); }
+.modal .title { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+.modal .desc { font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 20px; }
+.modal .btns { display: flex; gap: 12px; justify-content: center; }
+.btn { padding: 10px 28px; border-radius: 20px; font-size: 14px; cursor: pointer; border: none; transition: all 0.2s; }
+.btn-primary { background: var(--gold); color: #1a1a1a; }
+.btn-primary:hover { background: var(--gold-dark); }
+.btn-secondary { background: var(--bg-input); color: var(--text-secondary); border: 1px solid var(--border); }
+.btn-secondary:hover { background: #3a3530; }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover { background: #a93226; }
+.source-ref { border: 1px solid var(--border); border-radius: 10px; background: var(--bg-input); padding: 10px 12px; margin-top: 8px; }
+.source-ref .source-title { font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; }
+.source-ref .source-item { display: flex; align-items: center; gap: 6px; padding: 4px 0; font-size: 12px; color: var(--text); }
+.source-ref .source-item .source-idx { width: 18px; height: 18px; border-radius: 50%; background: rgba(31, 100%, 83%, 0.15); color: var(--gold); font-size: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.source-ref .source-item .source-link { color: var(--gold); cursor: pointer; margin-left: auto; font-size: 11px; }
+.quick-follow { margin-top: 8px; }
+.quick-follow .qf-title { font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; }
+.quick-follow .qf-item { padding: 8px 12px; background: rgba(31, 100%, 83%, 0.06); border: 1px solid rgba(31, 100%, 83%, 0.15); border-radius: 8px; font-size: 12px; color: var(--gold); cursor: pointer; margin-bottom: 4px; transition: all 0.2s; }
+.quick-follow .qf-item:hover { background: rgba(31, 100%, 83%, 0.12); }
+.hidden-module { display: none; }
+.dial-confirm { text-align: left; }
+.dial-confirm .phone-num { font-size: 20px; color: var(--text); font-weight: 700; margin: 8px 0; text-align: center; }
+.toast { position: fixed; bottom: 120px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.85); color: var(--gold); padding: 10px 24px; border-radius: 24px; font-size: 13px; z-index: 300; pointer-events: none; animation: toastIn 0.3s ease; }
+@keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+.network-toast { position: absolute; top: 60px; left: 50%; transform: translateX(-50%); background: rgba(180, 80, 30, 0.2); color: var(--gold); padding: 10px 20px; border-radius: 8px; font-size: 13px; z-index: 150; border: 1px solid rgba(31, 100%, 83%, 0.2); white-space: nowrap; }
+.privacy-modal .content { font-size: 12px; color: var(--text-secondary); line-height: 1.6; margin: 12px 0; max-height: 150px; overflow-y: auto; text-align: left; }
+.my-page { padding: 0; flex: 1; overflow-y: auto; }
+.my-welcome { padding: 24px 20px 12px; }
+.my-greeting { font-size: 26px; font-weight: 700; color: var(--text); }
+.my-brand { font-size: 14px; color: var(--text-secondary); margin-top: 4px; }
+.my-member-card { margin: 0 16px; background: linear-gradient(135deg, rgba(31, 100%, 83%, 0.15), rgba(31, 100%, 83%, 0.04)); border: 1px solid rgba(31, 100%, 83%, 0.2); border-radius: 16px; padding: 18px 20px; }
+.mmc-row { display: flex; align-items: center; }
+.mmc-item { flex: 1; text-align: center; }
+.mmc-divider { width: 1px; height: 40px; background: rgba(31, 100%, 83%, 0.2); }
+.mmc-val { font-size: 22px; font-weight: 700; color: var(--gold); }
+.mmc-unit { font-size: 13px; font-weight: 400; margin-left: 2px; }
+.mmc-label { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+.mmc-sub { font-size: 13px; color: var(--text); margin-top: 4px; font-weight: 500; }
+.my-city-card { margin: 12px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: all 0.2s; }
+.my-city-card:hover { border-color: var(--gold); }
+.mcc-icon { font-size: 32px; }
+.mcc-text { flex: 1; }
+.mcc-title { font-size: 15px; font-weight: 600; color: var(--text); }
+.mcc-sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+.mcc-arrow { font-size: 18px; color: var(--text-secondary); }
+.my-menu { margin: 0 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+.my-menu-item { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; font-size: 14px; color: var(--text); cursor: pointer; border-bottom: 1px solid var(--border); transition: background 0.15s; }
+.my-menu-item:last-child { border-bottom: none; }
+.my-menu-item:hover { background: var(--bg-input); }
+.menu-badge { font-size: 11px; padding: 3px 8px; border-radius: 10px; background: rgba(200, 80, 30, 0.15); color: var(--danger); }
+.bottom-tab-bar { display: flex; background: var(--bg-card); border-top: 1px solid var(--border); padding: 8px 0 16px; flex-shrink: 0; }
+.bottom-tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; color: var(--text-secondary); cursor: pointer; }
+.bottom-tab span { font-size: 18px; }
+.bottom-tab.active { color: var(--gold); }
+.fab { position: absolute; bottom: 120px; right: 24px; width: 56px; height: 56px; background: var(--gold); border-radius: 50%; box-shadow: 0 4px 16px rgba(200, 150, 80, 0.3); display: flex; align-items: center; justify-content: center; cursor: grab; z-index: 10; font-size: 26px; touch-action: none; user-select: none; }
+.fab:hover { transform: scale(1.05); }
+.fab.dragging { cursor: grabbing; transition: none; opacity: 0.85; }
+.fab.snapping { transition: left 0.3s ease, right 0.3s ease; }
+.vehicle-select { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text); font-weight: 500; cursor: pointer; background: none; border: none; }
+.vehicle-select .arrow { font-size: 10px; color: var(--text-secondary); }
+.no-vehicle-banner { background: rgba(31, 100%, 83%, 0.06); border: 1px solid rgba(31, 100%, 83%, 0.15); border-radius: 12px; padding: 12px 16px; margin: 8px 0; display: flex; align-items: center; gap: 10px; }
+.no-vehicle-banner .nv-text { font-size: 13px; color: var(--text-secondary); flex: 1; }
+.no-vehicle-banner .nv-link { font-size: 13px; color: var(--gold); cursor: pointer; white-space: nowrap; }
+.pull-loading { text-align: center; padding: 16px; font-size: 12px; color: var(--text-secondary); cursor: pointer; }
+.pull-loading:hover { color: var(--gold); }
+.pull-loading .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 6px; vertical-align: middle; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.privacy-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.75); z-index: 300; display: flex; align-items: center; justify-content: center; }
+/* ===== 状态机模块 ===== */
+.sm-screen { flex: 1; overflow-y: auto; padding: 0; display: flex; flex-direction: column; }
+.sm-tabs { display: flex; gap: 4px; padding: 10px 12px; overflow-x: auto; scrollbar-width: none; flex-shrink: 0; background: var(--bg); border-bottom: 1px solid var(--border); }
+.sm-tabs::-webkit-scrollbar { display: none; }
+.sm-tab { padding: 6px 14px; border-radius: 16px; font-size: 12px; white-space: nowrap; cursor: pointer; background: var(--bg-input); color: var(--text-secondary); border: 1px solid var(--border); transition: all 0.2s; }
+.sm-tab.active { background: var(--gold); color: #1a1a1a; border-color: var(--gold); font-weight: 600; }
+.sm-tab:hover:not(.active) { border-color: var(--gold); color: var(--text); }
+.sm-section { font-size: 10px; color: var(--text-secondary); letter-spacing: 1px; text-transform: uppercase; padding: 8px 12px 0; }
+.sm-chat { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+.sm-chat .user-msg { margin: 2px 0; }
+.sm-chat .ai-row { margin: 2px 0; }
+.sm-banner { background: rgba(31,100%,83%,0.06); border: 1px solid rgba(31,100%,83%,0.15); border-radius: 8px; padding: 8px 12px; font-size: 11px; color: var(--text-secondary); margin: 0 12px 4px; flex-shrink: 0; }
+.sm-banner strong { color: var(--gold); }
+.sm-retry-bar { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; margin: 0 12px 4px; font-size: 11px; color: var(--text-secondary); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+.sm-retry-btn { background: var(--gold); color: #1a1a1a; border: none; padding: 4px 10px; border-radius: 10px; font-size: 11px; cursor: pointer; font-weight: 500; }
+.sm-retry-btn:disabled { background: #3a3530; color: #666; cursor: default; }
+.sm-network-bar { background: rgba(200,80,30,0.12); border-bottom: 1px solid rgba(200,80,30,0.25); padding: 8px 14px; font-size: 11px; color: var(--danger); flex-shrink: 0; animation: smSlideDown 0.3s ease-out; }
+@keyframes smSlideDown { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.sm-offline-hint { text-align: center; font-size: 11px; color: var(--gold); padding: 6px 0 0 0; flex-shrink: 0; }
+.sm-input-area { background: var(--bg-card); border-top: 1px solid var(--border); padding: 10px 14px 18px; display: flex; align-items: flex-end; gap: 8px; flex-shrink: 0; }
+.sm-input-area.offline textarea { background: #222; color: #555; border-color: #2a2a2a; }
+.sm-input-area.offline textarea::placeholder { color: #444; }
+.sm-input-area.offline .send-btn { background: #2a2a2a; color: #555; cursor: not-allowed; }
+.sm-feedback { position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%); background: #333; color: var(--text); font-size: 11px; padding: 5px 12px; border-radius: 12px; z-index: 100; pointer-events: none; opacity: 0; transition: opacity 0.3s; }
+.sm-feedback.show { opacity: 1; }
+@keyframes smSentToFailed { from { background: var(--gold); color: #1a1a1a; } to { background: #3a3530; color: var(--text-secondary); } }
+.sm-bubble-failing { animation: smSentToFailed 0.5s ease-out forwards; }
+.sm-edit-btn { color: var(--text-secondary); cursor: pointer; background: none; border: none; font-size: 11px; margin-left: 8px; }
+.sm-edit-btn:hover { color: var(--gold); }
+.sm-scope-tbd { font-size: 9px; color: var(--text-secondary); margin-left: 2px; }
+.mobile-nav-toggle { display: none; position: fixed; top: 12px; left: 12px; width: 36px; height: 36px; border-radius: 50%; background: var(--bg-card); border: 1px solid var(--border); color: var(--text); font-size: 18px; cursor: pointer; z-index: 400; align-items: center; justify-content: center; }
+@media (max-width: 800px) { body { flex-direction: column; align-items: center; padding: 0; } .layout-left { width: 260px; position: fixed; left: -280px; top: 0; bottom: 0; z-index: 350; max-height: 100vh; padding: 60px 8px 8px; background: #0d0d0d; transition: left 0.3s; overflow-y: auto; } .layout-left.show { left: 0; } .phone-wrap { margin-left: 0; } .phone { width: 100vw; height: 100vh; border-radius: 0; box-shadow: none; } .mobile-nav-toggle { display: flex; } .phone-wrap { width: 100%; } }
+</style>
+</head>
+<body>
+<button class="mobile-nav-toggle" onclick="document.querySelector('.layout-left').classList.toggle('show');this.textContent=this.textContent==='☰'?'✕':'☰'">☰</button>
+<div class="password-gate" id="passGate">
+  <div class="gate-box">
+    <div class="gate-icon">🔒</div>
+    <div class="gate-title">AI Chat Box 原型</div>
+    <div class="gate-desc">请输入访问密码</div>
+    <input type="password" class="gate-input" id="passInput" placeholder="输入密码" onkeydown="if(event.key==='Enter')checkPass()">
+    <button class="gate-btn" onclick="checkPass()">进入</button>
+    <div class="gate-error" id="passError">密码错误</div>
+  </div>
+</div>
+
+<div id="mainApp" style="display:none">
+<div class="layout-left">
+  <nav class="side-nav" id="sideNav">
+    <div class="side-nav-item active" data-screen="home">🏠 首页入口</div>
+    <div class="side-nav-item" data-screen="chat-empty">📝 空态引导</div>
+    <div class="side-nav-item" data-screen="chat-empty-novehicle">🚫 未绑车用户</div>
+    <div class="side-nav-item" data-screen="chat-qa">💬 问答交互</div>
+    <div class="side-nav-item" data-screen="chat-qa-streaming">⏳ 流式回复</div>
+    <div class="side-nav-item" onclick="toggleSubNav('subBoundary')">🔍 边界场景 <span class="expand-icon">▶</span></div>
+    <div class="side-nav-item" data-screen="chat-error">⚠️ 异常状态</div>
+    <div class="side-nav-item" data-screen="modals">🪟 弹窗引导</div>
+    <div class="side-nav-item" data-screen="statemachine">📊 状态机</div>
+    <div class="side-nav-divider"></div>
+    <div class="side-nav-item" id="offlineToggleLabel" onclick="toggleOffline()" style="color:var(--danger)">🔴 模拟离线</div>
+  </nav>
+  <div class="sub-nav" id="subBoundary">
+    <div class="sub-nav-item" onclick="navTo('chat-boundary');sendBoundary('敏感内容测试')">🚫 P1 内容安全</div>
+    <div class="sub-nav-item" onclick="navTo('chat-boundary');sendBoundary('刹车失灵了怎么办')">🆘 P2 紧急安全</div>
+    <div class="sub-nav-item" onclick="navTo('chat-boundary');sendBoundary('你们车质量太差了我要投诉')">😡 P3 投诉抱怨</div>
+    <div class="sub-nav-item" onclick="navTo('chat-boundary');sendBoundary('服务异常')">⚠️ P4 服务异常</div>
+    <div class="sub-nav-item" onclick="navTo('chat-boundary');sendBoundary('坏了怎么办&clarify=1')">❓ P5 模糊澄清(1/2)</div>
+    <div class="sub-nav-item" onclick="navTo('chat-boundary');sendBoundary('就是不好使&clarify=2')">❓ P5 模糊澄清(2/2→Fallback)</div>
+    <div class="sub-nav-item" onclick="navTo('chat-boundary');sendBoundary('这车多少钱有什么优惠')">💰 P6 超出知识库</div>
+    <div class="sub-nav-item" onclick="navTo('chat-boundary');sendBoundary('沃尔沃和你们谁好')">⚔️ P7 竞品比较</div>
+    <div class="sub-nav-item" onclick="navTo('chat-boundary');sendBoundary('方向盘怎么调&repeat=1')">🔄 P8 重复问题</div>
+    <div class="sub-nav-item" onclick="navTo('chat-boundary');sendBoundary('如何开启定速巡航')">✅ P9 正常问答</div>
+  </div>
+</div>
+
+<div class="phone-wrap">
+<div class="phone" id="app">
+  <div class="phone-inner">
+    <!-- HOME -->
+    <div class="screen active" id="screen-home">
+      <div class="my-page">
+        <div class="my-welcome"><div class="my-greeting">你好！</div><div class="my-brand">开启NEXTERA体验</div></div>
+        <div class="my-member-card"><div class="mmc-row"><div class="mmc-item"><div class="mmc-val">2<span class="mmc-unit">天</span></div><div class="mmc-label">加入天数</div></div><div class="mmc-divider"></div><div class="mmc-item"><div class="mmc-val">20<span class="mmc-unit">个</span></div><div class="mmc-label">可用权益</div></div><div class="mmc-divider"></div><div class="mmc-item"><div class="mmc-label">今天是你加入的</div><div class="mmc-sub">第2天</div></div></div></div>
+        <div class="my-city-card" onclick="toast('点亮城市')"><div class="mcc-icon">🌍</div><div class="mcc-text"><div class="mcc-title">点亮城市</div><div class="mcc-sub">探索更多城市，解锁专属权益</div></div><div class="mcc-arrow">›</div></div>
+        <div class="my-menu">
+          <div class="my-menu-item" onclick="navTo('chat-empty')"><span>🚛 我的车辆</span><span>›</span></div>
+          <div class="my-menu-item" onclick="toast('智驾学堂')"><span>📚 智驾学堂</span><span>›</span></div>
+          <div class="my-menu-item" onclick="toast('车联网卡实名认证')"><span>🪪 车联网卡实名认证</span><span class="menu-badge">待办</span></div>
+          <div class="my-menu-item" onclick="toast('我的订单')"><span>📋 我的订单</span><span>›</span></div>
+          <div class="my-menu-item" onclick="toast('联系我们')"><span>📞 联系我们</span><span>›</span></div>
+        </div>
+      </div>
+      <div class="bottom-tab-bar"><div class="bottom-tab"><span>🚛</span>车辆</div><div class="bottom-tab"><span>🔧</span>服务</div><div class="bottom-tab active"><span>👤</span>我的</div></div>
+      <div class="fab" id="assistantFab" onmousedown="startDrag(event)" ontouchstart="startDrag(event)">🤖</div>
+    </div>
+
+    <!-- CHAT EMPTY -->
+    <div class="screen" id="screen-chat-empty">
+      <div class="header"><button class="back" onclick="navTo('home')">←</button><span class="center">AI Chat Box</span><button class="vehicle-select" onclick="toggleEl('vpEmpty')">沪A·12345 E27 <span class="arrow">▼</span></button><div class="header-right-group"><button class="right" onclick="newChat()">新对话</button><button class="auto-voice-btn" onclick="toggleAutoVoice()" title="自动语音播报">🔇</button></div></div>
+      <div class="offline-banner" id="offlineEmpty">当前为离线状态，请检查你的网络</div>
+      <div class="chat-body" id="emptyChatBody">
+        <div class="welcome-area"><div class="robot-icon">🤖</div><div class="welcome-text">你好，我是 Scania 智能助手，关于车辆使用的问题都可以问我。</div></div>
+        <div class="faq-module"><div class="faq-module-header">📂 常用问题</div><div class="faq-session-tabs" id="faqTabs"><div class="faq-session-tab active" data-panel="faqPanel1">车书</div><div class="faq-session-tab" data-panel="faqPanel2">APP操作</div></div><div class="faq-panel active" id="faqPanel1"><div class="faq-item" onclick="sendFromCard('如何换挡？')"><span class="icon">?</span>如何换挡？</div><div class="faq-item" onclick="sendFromCard('如何调节后视镜？')"><span class="icon">?</span>如何调节后视镜？</div><div class="faq-item" onclick="sendFromCard('方向盘怎么调节？')"><span class="icon">?</span>方向盘怎么调节？</div></div><div class="faq-panel" id="faqPanel2"><div class="faq-item" onclick="sendFromCard('怎么绑车？')"><span class="icon">?</span>怎么绑车？</div><div class="faq-item" onclick="sendFromCard('如何进行车联网卡实名认证？')"><span class="icon">?</span>如何进行车联网卡实名认证？</div><div class="faq-item" onclick="sendFromCard('车辆识别代码（VIN）在哪里？')"><span class="icon">?</span>车辆识别代码（VIN）在哪里？</div></div></div>
+      </div>
+      <div class="keyword-row"><div class="keyword-tag" onclick="sendFromCard('体验数字钥匙')">体验数字钥匙</div><div class="keyword-tag" onclick="sendFromCard('新车交付指南')">新车交付指南</div></div>
+      <div class="chat-input-area"><textarea class="chat-input" id="inputEmpty" placeholder="输入您的问题，例如：如何调节方向盘高度？" rows="1" oninput="updateSendBtn('inputEmpty','sendBtnEmpty')"></textarea><button class="send-btn" id="sendBtnEmpty" disabled onclick="sendFromCard(document.getElementById('inputEmpty').value)">→</button></div>
+      <div class="vehicle-picker" id="vpEmpty" style="display:none"><div class="item" onclick="selectVehicle('沪A·12345','E27','vpEmpty')">沪A·12345 · NEXT ERA E27 <span class="check">✓</span></div><div class="item" onclick="selectVehicle('沪B·67890','G Series ICE','vpEmpty')">沪B·67890 · G Series ICE</div><div class="item" onclick="selectVehicle('沪C·11111','E29','vpEmpty')">沪C·11111 · NEXT ERA E29</div></div>
+      <div class="privacy-overlay" id="privacyFirstOverlay" style="display:none">
+        <div class="modal privacy-modal" style="margin:40px;max-width:320px">
+          <div class="title">隐私协议</div>
+          <div class="content">感谢您使用卡车助手。我们重视您的隐私和数据安全。<br><br>1. 数据采集：当您使用AI问答功能时，我们会采集您的对话内容、FAQ点击数据，用于优化答案质量。<br><br>2. 数据使用：采集的数据仅用于提升服务质量，不会用于其他商业用途。<br><br>3. 数据安全：您的个人信息和车辆数据将受到严格保护，不会泄露给第三方。<br><br>4. 车辆信息：您的VIN码仅用于匹配知识库，不会在APP端持久化存储。</div>
+          <div class="btns"><button class="btn btn-secondary" onclick="rejectPrivacy()">不同意</button><button class="btn btn-primary" onclick="acceptPrivacy()">同意并继续</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHAT EMPTY - NO VEHICLE -->
+    <div class="screen" id="screen-chat-empty-novehicle">
+      <div class="header"><button class="back" onclick="navTo('home')">←</button><span class="center">AI Chat Box</span><span style="font-size:13px;color:var(--text-secondary)">未选择车辆</span><div class="header-right-group"><button class="right" onclick="newChat()">新对话</button><button class="auto-voice-btn" onclick="toggleAutoVoice()" title="自动语音播报">🔇</button></div></div>
+      <div class="offline-banner" id="offlineNV">当前为离线状态，请检查你的网络</div>
+      <div class="chat-body"><div class="welcome-area"><div class="robot-icon">🤖</div><div class="welcome-text">你好，我是 Scania 智能助手，关于车辆使用的问题都可以问我。</div></div><div class="no-vehicle-banner"><span style="font-size:20px">🚛</span><span class="nv-text">MVP1 不依赖车辆绑定：当前知识库仅支持单一车型，VIN 不参与检索，已绑车/未绑车用户均可正常使用。</span><span class="nv-link" onclick="toast('后续：支持多车型后，基于VIN识别车型实现差异化回答')">Vehicle Dependency ›</span></div><div class="faq-module"><div class="faq-module-header">📂 常用问题</div><div class="faq-session-tabs"><div class="faq-session-tab active" data-panel="nvPanel1">车型介绍</div><div class="faq-session-tab" data-panel="nvPanel2">APP操作</div></div><div class="faq-panel active" id="nvPanel1"><div class="faq-item" onclick="sendFromCard('NEXT ERA E27 有什么配置？')"><span class="icon">?</span>NEXT ERA E27 有什么配置？</div><div class="faq-item" onclick="sendFromCard('Scania 卡车有哪些优势？')"><span class="icon">?</span>Scania 卡车有哪些优势？</div><div class="faq-item" onclick="sendFromCard('如何绑定车辆？')"><span class="icon">?</span>如何绑定车辆？</div></div><div class="faq-panel" id="nvPanel2"><div class="faq-item" onclick="sendFromCard('怎么绑车？')"><span class="icon">?</span>怎么绑车？</div><div class="faq-item" onclick="sendFromCard('如何进行车联网卡实名认证？')"><span class="icon">?</span>如何进行车联网卡实名认证？</div><div class="faq-item" onclick="sendFromCard('车辆识别代码（VIN）在哪里？')"><span class="icon">?</span>车辆识别代码（VIN）在哪里？</div></div></div></div>
+      <div class="keyword-row"><div class="keyword-tag" onclick="sendFromCard('体验数字钥匙')">体验数字钥匙</div><div class="keyword-tag" onclick="sendFromCard('NEXT ERA 新品介绍')">NEXT ERA 新品介绍</div></div>
+      <div class="chat-input-area"><textarea class="chat-input" id="inputNV" placeholder="输入您的问题..." rows="1" oninput="updateSendBtn('inputNV','sendBtnNV')"></textarea><button class="send-btn" id="sendBtnNV" disabled onclick="sendFromCard(document.getElementById('inputNV').value)">→</button></div>
+    </div>
+
+    <!-- Q&A COMPLETE -->
+    <div class="screen" id="screen-chat-qa">
+      <div class="header"><button class="back" onclick="navTo('home')">←</button><span class="center">AI Chat Box</span><button class="vehicle-select" onclick="toggleEl('vpQA')">沪A·12345 E27 <span class="arrow">▼</span></button><div class="header-right-group"><button class="right" onclick="navTo('chat-empty')">新对话</button><button class="auto-voice-btn" onclick="toggleAutoVoice()" title="自动语音播报">🔇</button></div></div>
+      <div class="offline-banner" id="offlineQA">当前为离线状态，请检查你的网络</div>
+      <div class="chat-body" id="qaCompleteBody"><div class="msg-system">── 已切换到「沪A·12345 E27」──</div><div class="user-msg"><div class="bubble">方向盘怎么调？</div></div><div class="ai-row"><div class="ai-avatar">🤖</div><div class="ai-col"><div class="ai-name">卡车助手</div><div class="ai-bubble">方向盘调节步骤如下：<br><br>1. 找到方向盘下方的调节杆<br>2. 向下推动调节杆解锁<br>3. 调整方向盘到合适的高度和角度<br>4. 向上拉回调节杆锁定位置<br><br><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='140'%3E%3Crect width='300' height='140' fill='%232a2a2a' rx='10'/%3E%3Ctext x='150' y='65' text-anchor='middle' fill='%239a8e7e' font-size='13'%3E🖼️ 方向盘调节示意图%3C/text%3E%3Ctext x='150' y='90' text-anchor='middle' fill='%236a6a6a' font-size='11'%3E（调节杆位置 / 解锁方向）%3C/text%3E%3C/svg%3E" class="ai-img" alt="示意图"><span class="ai-link" onclick="toggleArt('artComplete')">📖 查看完整操作图示（车书第3.2.1章节）</span><div class="art-expand" id="artComplete"><div class="art-title">📖 方向盘调节 · 车书第3.2.1章节</div><div class="art-content"><strong>安全提示：</strong>请勿在行驶中调节方向盘。<br><br><strong>操作步骤：</strong><br>1. 将座椅调整至舒适位置<br>2. 找到方向盘下方的调节杆<br>3. 向下推动调节杆至解锁位置<br>4. 调整至合适高度和角度<br>5. 确保能清晰看到仪表盘所有指示灯<br>6. 向上拉回调节杆，听到"咔哒"声表示已锁定<br>7. 尝试上下晃动方向盘确认已锁紧</div><span class="art-close" onclick="toggleArt('artComplete');event.stopPropagation()">收起 ▲</span></div><div class="source-ref"><div class="source-title">📖 参考来源</div><div class="source-item"><span class="source-idx">1</span>NEXT ERA 用户手册 · 第3.2.1章节 方向盘调节<span class="source-link" onclick="toast('跳转到车书第3.2.1章节')">查看原文 ›</span></div><div class="source-item"><span class="source-idx">2</span>NEXT ERA 用户手册 · 第3.2 驾驶舱操作<span class="source-link" onclick="toast('跳转到车书第3.2章节')">查看原文 ›</span></div></div><div class="disclaimer">内容由AI生成，仅供参考</div></div></div></div><div class="quick-follow"><div class="qf-title">💡 你可能还想问</div><div class="qf-item" onclick="sendFromCard('如何调节后视镜？')">如何调节后视镜？</div><div class="qf-item" onclick="sendFromCard('座椅怎么调节？')">座椅怎么调节？</div></div></div>
+      <div class="chat-input-area"><textarea class="chat-input" id="inputQA" placeholder="输入您的问题..." rows="1" oninput="updateSendBtn('inputQA','sendBtnQA')"></textarea><button class="send-btn" id="sendBtnQA" disabled onclick="sendFromUI('inputQA')">→</button></div>
+      <div class="vehicle-picker" id="vpQA" style="display:none"><div class="item" onclick="switchVeh('沪A·12345','E27','vpQA')">沪A·12345 · NEXT ERA E27 <span class="check">✓</span></div><div class="item" onclick="switchVeh('沪B·67890','G Series ICE','vpQA')">沪B·67890 · G Series ICE</div><div class="item" onclick="switchVeh('沪C·11111','E29','vpQA')">沪C·11111 · NEXT ERA E29</div></div>
+    </div>
+
+    <!-- STREAMING Q&A -->
+    <div class="screen" id="screen-chat-qa-streaming">
+      <div class="header"><button class="back" onclick="stopStream();navTo('home')">←</button><span class="center">AI Chat Box</span><button class="vehicle-select">沪A·12345 E27 <span class="arrow">▼</span></button><div class="header-right-group"><button class="right" onclick="stopStream();navTo('chat-empty')">新对话</button><button class="auto-voice-btn" onclick="toggleAutoVoice()" title="自动语音播报">🔇</button></div></div>
+      <div class="offline-banner" id="offlineStream">当前为离线状态，请检查你的网络</div>
+      <div class="chat-body" id="streamBody"><div class="user-msg"><div class="bubble">方向盘怎么调？</div></div><div class="think-row" id="streamThink"><div class="ai-avatar">🤖</div><div class="ai-col"><div class="ai-name">卡车助手</div><div class="think-box"><div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div><span class="think-status" id="thinkStatus">正在查找车书...</span></div></div></div><div class="ai-row" id="streamAnswer" style="display:none"><div class="ai-avatar">🤖</div><div class="ai-col"><div class="ai-name">卡车助手</div><div class="ai-bubble" id="streamBubble"><span class="streaming-cursor" id="streamCursor"></span></div></div></div><div class="msg-actions" id="streamActions" style="display:none"><button class="msg-action" id="voiceBtnStream" onclick="toggleVoiceInline('voiceInlineStream','voiceBtnStream')">🔊 播报</button></div><div class="ai-row" id="voiceInlineStream" style="display:none"><div class="ai-avatar">🤖</div><div class="ai-col"><div class="ai-name">卡车助手</div><div class="ai-bubble"><span id="voiceStreamText">方向盘调节步骤如下：...</span><div class="voice-inline"><span class="v-status">🔊 正在播报...</span><button class="v-btn" id="vPauseStream" onclick="pauseVoiceInline('vPauseStream')">⏸</button><button class="v-btn stop" onclick="stopVoiceInline('voiceInlineStream','voiceBtnStream')">⏹</button></div></div></div></div></div>
+      <div class="chat-input-area"><textarea class="chat-input" id="inputStream" placeholder="输入您的问题..." rows="1" oninput="updateSendBtn('inputStream','sendBtnStream')"></textarea><button class="send-btn" id="sendBtnStream" disabled onclick="sendFromUI('inputStream')">→</button></div>
+    </div>
+
+    <!-- BOUNDARY SCENARIOS -->
+    <div class="screen" id="screen-chat-boundary">
+      <div class="header"><button class="back" onclick="navTo('home')">←</button><span class="center">AI Chat Box</span><span style="font-size:13px;color:var(--text-secondary)">未选择车辆</span><div class="header-right-group"><button class="right" onclick="resetReject();navTo('chat-empty')">新对话</button><button class="auto-voice-btn" onclick="toggleAutoVoice()" title="自动语音播报">🔇</button></div></div>
+      <div class="offline-banner" id="offlineBoundary">当前为离线状态，请检查你的网络</div>
+      <div class="chat-body"><div class="welcome-area"><div class="robot-icon">🤖</div><div class="welcome-text">你好，我是 Scania 智能助手，关于车辆使用的问题都可以问我。</div></div><div class="no-vehicle-banner"><span style="font-size:20px">🚛</span><span class="nv-text">绑定车辆后，我可以为您提供更精准的回答</span><span class="nv-link" onclick="toast('跳转到车辆管理')">去绑定 ›</span></div><div class="faq-module"><div class="faq-module-header">📂 常用问题</div><div class="faq-session-tabs"><div class="faq-session-tab active" data-panel="bdPanel1">车书</div></div><div class="faq-panel active" id="bdPanel1"><div class="faq-item" onclick="sendBoundaryMsgFromCard('如何换挡？')"><span class="icon">?</span>如何换挡？</div><div class="faq-item" onclick="sendBoundaryMsgFromCard('如何调节后视镜？')"><span class="icon">?</span>如何调节后视镜？</div><div class="faq-item" onclick="sendBoundaryMsgFromCard('方向盘怎么调节？')"><span class="icon">?</span>方向盘怎么调节？</div></div></div></div>
+      <div class="chat-input-area"><textarea class="chat-input" id="inputBoundary" placeholder="输入任意问题，系统自动匹配场景..." rows="1" oninput="updateSendBtn('inputBoundary','sendBtnBoundary')"></textarea><button class="send-btn" id="sendBtnBoundary" disabled onclick="sendBoundaryMsg()">→</button></div>
+    </div>
+
+    <!-- ERROR -->
+    <div class="screen" id="screen-chat-error">
+      <div class="header"><button class="back" onclick="navTo('home')">←</button><span class="center">AI Chat Box</span><button class="vehicle-select">沪A·12345 E27 <span class="arrow">▼</span></button><div class="header-right-group"><button class="right" onclick="navTo('chat-empty')">新对话</button><button class="auto-voice-btn" onclick="toggleAutoVoice()" title="自动语音播报">🔇</button></div></div>
+      <div class="offline-banner" id="offlineError">当前为离线状态，请检查你的网络</div>
+      <div class="chat-body"><div class="msg-system">── 发送中 ──</div><div class="user-msg"><div class="bubble sending">方向盘怎么调？</div></div><div class="msg-system">── 发送失败 ──</div><div class="user-msg"><div class="bubble failed">方向盘怎么调？</div></div><div class="error-msg">⚠️ 发送失败，<span class="retry" onclick="toast('已重新发送')">点击重试</span></div><div class="msg-system" style="margin-top:16px">── 请求超时 ──</div><div class="think-row"><div class="ai-avatar">🤖</div><div class="ai-col"><div class="ai-name">卡车助手</div><div class="think-box"><div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div><span class="think-status">正在查找车书...</span></div></div></div><div class="error-msg">⏱ 请求超时，请重试<br><span class="retry" onclick="toast('已重新发送')">点击重试</span></div><div class="msg-system" style="margin-top:16px">── 服务异常 ──</div><div class="error-msg">⚠️ 服务异常，请稍后重试<br><span class="retry" onclick="toast('已重新发送')">点击重试</span></div><div class="msg-system" style="margin-top:16px">── VIN 无效 ──</div><div class="error-msg">⚠️ VIN码无效，请检查车辆信息</div><div class="msg-system" style="margin-top:12px">── 车辆未识别 ──</div><div class="error-msg">⚠️ 未识别到车辆信息，请联系客服</div></div>
+      <div class="chat-input-area"><textarea class="chat-input" id="inputError" placeholder="输入您的问题..." rows="1" oninput="updateSendBtn('inputError','sendBtnError')"></textarea><button class="send-btn" id="sendBtnError" disabled onclick="showNetToast()">→</button></div>
+      <div class="network-toast" id="netToast" style="display:none">网络不可用，请稍后重试</div>
+    </div>
+
+    <!-- STATE MACHINE -->
+    <div class="screen" id="screen-statemachine">
+      <div class="header"><button class="back" onclick="navTo('home')">←</button><span class="center">消息状态机</span><span class="sm-header-dot" id="smHeaderDot" style="width:8px;height:8px;border-radius:50%;background:var(--gold);"></span></div>
+      <div class="sm-network-bar" id="smNetBar" style="display:none">当前网络不可用，请检查网络连接后重试</div>
+      <div class="sm-banner" id="smBanner" style="display:none"></div>
+      <div class="sm-retry-bar" id="smBulkBar" style="display:none"><span>3 条消息发送失败</span><button class="sm-retry-btn" id="smBulkBtn">一键重试</button></div>
+      <div class="sm-flow" id="smFlow" style="display:none"></div>
+      <div class="sm-section" style="padding-top:4px">正常流转</div>
+      <div class="sm-tabs" id="smTabs1">
+        <span class="sm-tab active" data-sm="flow-full">完整流转</span>
+        <span class="sm-tab" data-sm="flow-user">User 状态</span>
+        <span class="sm-tab" data-sm="flow-ai">AI 状态</span>
+      </div>
+      <div class="sm-section">边界场景</div>
+      <div class="sm-tabs" id="smTabs2">
+        <span class="sm-tab" data-sm="edge-rapid">连续快速发送</span>
+        <span class="sm-tab" data-sm="edge-edit">Failed 后编辑</span>
+        <span class="sm-tab" data-sm="edge-newsend">Failed 后发新消息</span>
+        <span class="sm-tab" data-sm="edge-bulk">多条 Failed</span>
+      </div>
+      <div class="sm-section">网络状态</div>
+      <div class="sm-tabs" id="smTabs3">
+        <span class="sm-tab" data-sm="off-send">发送后断网</span>
+        <span class="sm-tab" data-sm="off-idle">空闲断网</span>
+        <span class="sm-tab" data-sm="off-recover">断网恢复</span>
+      </div>
+      <div class="sm-chat" id="smChat"></div>
+      <div class="sm-offline-hint" id="smOffHint" style="display:none">网络连接已恢复，可以继续提问</div>
+      <div class="sm-input-area" id="smInputArea"><textarea class="chat-input" id="smInput" placeholder="在这里输入你的问题..." rows="1"></textarea><button class="send-btn" id="smSendBtn">→</button></div>
+      <div class="sm-feedback" id="smFeedback" style="display:none"></div>
+    </div>
+
+    <!-- MODALS -->
+    <div class="screen" id="screen-modals">
+      <div class="header"><span class="center">AI Chat Box</span></div>
+      <div class="chat-body" style="align-items:center;justify-content:center;gap:16px;padding:40px"><button class="btn btn-primary" onclick="showPrivacy()" style="width:200px">隐私协议</button><button class="btn btn-primary" onclick="showEl('clearModalM');navTo('modals')" style="width:200px">清空确认弹窗</button></div>
+      <div class="modal-overlay" id="privacyOverlay" style="display:none"><div class="modal privacy-modal"><div class="title">隐私协议</div><div class="content">感谢您使用卡车助手。我们重视您的隐私和数据安全。<br><br>1. 数据采集：当您使用AI问答功能时，我们会采集您的对话内容、FAQ点击数据，用于优化答案质量。<br><br>2. 数据使用：采集的数据仅用于提升服务质量，不会用于其他商业用途。<br><br>3. 数据安全：您的个人信息和车辆数据将受到严格保护，不会泄露给第三方。<br><br>4. 车辆信息：您的VIN码仅用于匹配知识库，不会在APP端持久化存储。</div><div class="btns"><button class="btn btn-secondary" onclick="hideEl('privacyOverlay');toast('已退出')">不同意</button><button class="btn btn-primary" onclick="acceptPrivacy()">同意</button></div></div></div>
+      <div class="modal-overlay" id="clearModalM" style="display:none"><div class="modal"><div class="title">确认清空全部聊天记录？</div><div class="desc">此操作不可恢复。</div><div class="btns"><button class="btn btn-secondary" onclick="hideEl('clearModalM')">取消</button><button class="btn btn-danger" onclick="hideEl('clearModalM');toast('已清空全部记录')">确认</button></div></div></div>
+    </div>
+
+    <div class="modal-overlay" id="dialOverlay" style="display:none"><div class="modal dial-confirm"><div class="title">📞 拨打客服热线</div><div class="phone-num">400-xxx-xxxx</div><div class="desc">确认拨打 Scania 客服热线？</div><div class="btns"><button class="btn btn-secondary" onclick="hideEl('dialOverlay')">取消</button><button class="btn btn-primary" onclick="hideEl('dialOverlay');toast('已拨打客服热线')">确认拨打</button></div></div></div>
+    <div class="modal-overlay" id="newChatModal" style="display:none"><div class="modal"><div class="title">开启新对话</div><div class="desc">当前聊天记录将被清空，确定要开始新对话吗？</div><div class="btns"><button class="btn btn-secondary" onclick="hideEl('newChatModal')">取消</button><button class="btn btn-primary" onclick="hideEl('newChatModal');doNewChat()">确认</button></div></div></div>
+    <div class="toast" id="toast" style="display:none"></div>
+  </div>
+</div>
+</div>
+
+<script>
+// 密码验证
+function checkPass(){
+  var pw=document.getElementById('passInput').value;
+  if(pw==='scania2026'){document.getElementById('passGate').style.display='none';document.getElementById('mainApp').style.display='flex';sessionStorage.setItem('protoPass','1');}
+  else{document.getElementById('passError').classList.add('show');}
+}
+if(sessionStorage.getItem('protoPass')==='1'){document.getElementById('passGate').style.display='none';document.getElementById('mainApp').style.display='flex';}
+function navTo(name){stopStream();document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active');});var target=document.getElementById('screen-'+name);if(target)target.classList.add('active');document.querySelectorAll('.side-nav-item').forEach(function(i){i.classList.remove('active');});document.querySelectorAll('.side-nav-item').forEach(function(i){if(i.dataset.screen===name)i.classList.add('active');});hideAllMenus();}
+document.querySelectorAll('.side-nav-item[data-screen]').forEach(function(item){item.addEventListener('click',function(){navTo(this.dataset.screen);});});
+function toggleSubNav(id){var el=document.getElementById(id);el.classList.toggle('show');var parent=el.previousElementSibling;if(parent)parent.classList.toggle('expanded');}
+function toast(msg){var t=document.getElementById('toast');t.textContent=msg;t.style.display='block';clearTimeout(t._t);t._t=setTimeout(function(){t.style.display='none';},2000);}
+function toggleEl(id){var el=document.getElementById(id);el.style.display=el.style.display==='none'?'block':'none';}
+function hideEl(id){document.getElementById(id).style.display='none';}
+function showEl(id){document.getElementById(id).style.display='flex';}
+function hideAllMenus(){document.querySelectorAll('.vehicle-picker').forEach(function(m){m.style.display='none';});}
+
+// 悬浮按钮拖拽 + 边框吸附
+var fabDrag={startX:0,startY:0,startLeft:0,startTop:0,moved:false};
+function startDrag(e){
+  e.preventDefault();var fab=document.getElementById('assistantFab');
+  var t=e.touches?e.touches[0]:e;
+  fabDrag.startX=t.clientX;fabDrag.startY=t.clientY;
+  fabDrag.startLeft=fab.offsetLeft;fabDrag.startTop=fab.offsetTop;
+  fabDrag.moved=false;fab.classList.add('dragging');
+  document.addEventListener('mousemove',onDrag);document.addEventListener('mouseup',stopDrag);
+  document.addEventListener('touchmove',onDrag,{passive:false});document.addEventListener('touchend',stopDrag);
+}
+function onDrag(e){
+  var fab=document.getElementById('assistantFab');var phone=fab.closest('.phone');
+  var t=e.touches?e.touches[0]:e;
+  var dx=t.clientX-fabDrag.startX;var dy=t.clientY-fabDrag.startY;
+  var newLeft=fabDrag.startLeft+dx;var newTop=fabDrag.startTop+dy;
+  var maxLeft=phone.offsetWidth-fab.offsetWidth;var maxTop=phone.offsetHeight-fab.offsetHeight;
+  if(Math.abs(dx)>3||Math.abs(dy)>3)fabDrag.moved=true;
+  fab.style.left=Math.max(0,Math.min(newLeft,maxLeft))+'px';
+  fab.style.top=Math.max(0,Math.min(newTop,maxTop))+'px';
+  fab.style.right='auto';fab.style.bottom='auto';
+}
+function stopDrag(e){
+  document.removeEventListener('mousemove',onDrag);document.removeEventListener('mouseup',stopDrag);
+  document.removeEventListener('touchmove',onDrag);document.removeEventListener('touchend',stopDrag);
+  var fab=document.getElementById('assistantFab');fab.classList.remove('dragging');
+  var phone=fab.closest('.phone');var center=phone.offsetWidth/2;
+  var fabCenter=fab.offsetLeft+fab.offsetWidth/2;
+  fab.classList.add('snapping');
+  if(fabCenter<center){fab.style.left='16px';fab.style.right='auto';}else{fab.style.left='auto';fab.style.right='16px';}
+  setTimeout(function(){fab.classList.remove('snapping');},350);
+  if(!fabDrag.moved){enterChat();}
+  fabDrag.moved=false;
+}
+function updateSendBtn(inpId,btnId){document.getElementById(btnId).disabled=!document.getElementById(inpId).value.trim();}
+document.querySelectorAll('.faq-session-tab').forEach(function(tab){tab.addEventListener('click',function(){var parent=this.parentElement;var grandparent=parent.parentElement;parent.querySelectorAll('.faq-session-tab').forEach(function(t){t.classList.remove('active');});this.classList.add('active');grandparent.querySelectorAll('.faq-panel').forEach(function(p){p.classList.remove('active');});var panel=document.getElementById(this.dataset.panel);if(panel)panel.classList.add('active');});});
+
+// 首次进入聊天 & 隐私协议
+var chatVisited=false;
+function enterChat(){
+  chatVisited=true;
+  navTo('chat-empty');
+  if(!privacyAccepted()){
+    setTimeout(function(){showEl('privacyFirstOverlay');},100);
+  }
+}
+function privacyAccepted(){return sessionStorage.getItem('privacyAccepted')==='true';}
+function acceptPrivacy(){
+  sessionStorage.setItem('privacyAccepted','true');
+  hideEl('privacyFirstOverlay');hideEl('privacyOverlay');
+  toast('已同意隐私协议');
+}
+function rejectPrivacy(){
+  hideEl('privacyFirstOverlay');
+  chatVisited=false;
+  navTo('home');
+  toast('请同意隐私协议后继续使用');
+}
+
+function sendFromCard(q){if(q&&q.trim()){chatVisited=true;toast('已发送: '+q);navTo('chat-qa');}}
+function sendFromUI(inpId){var q=document.getElementById(inpId).value;if(!q||!q.trim())return;document.getElementById(inpId).value='';updateSendBtn(inpId,inpId.replace('input','sendBtn'));toast('已发送: '+q);navTo('chat-qa');}
+function newChat(){showEl('newChatModal');}
+function doNewChat(){chatVisited=false;toast('已开启新对话');navTo('chat-empty');}
+
+// Streaming
+var streamTimer=null,streamIdx=0;
+var streamFullText='方向盘调节步骤如下：\n\n1. 找到方向盘下方的调节杆\n2. 向下推动调节杆解锁\n3. 调整方向盘到合适的高度和角度\n4. 向上拉回调节杆锁定位置\n\n推荐：方向盘上沿与肩膀齐平，手臂自然弯曲约120度。\n\n安全提示：请勿在行驶中调节方向盘。';
+function startStream(){var think=document.getElementById('streamThink'),status=document.getElementById('thinkStatus'),answer=document.getElementById('streamAnswer'),bubble=document.getElementById('streamBubble'),actions=document.getElementById('streamActions'),sendBtn=document.getElementById('sendBtnStream');think.style.display='flex';answer.style.display='none';actions.style.display='none';sendBtn.textContent='⏹';sendBtn.onclick=stopStreamingFull;sendBtn.disabled=false;status.textContent='正在查找车书...';streamIdx=0;bubble.innerHTML='<span class="streaming-cursor" id="streamCursor"></span>';clearTimeout(streamTimer);streamTimer=setTimeout(function(){status.textContent='正在组织答案...';streamTimer=setTimeout(function(){think.style.display='none';answer.style.display='flex';actions.style.display='flex';streamTimer=setInterval(streamChar,60);},800);},1000);}
+function streamChar(){var bubble=document.getElementById('streamBubble');if(streamIdx<streamFullText.length){streamIdx++;bubble.innerHTML=streamFullText.substring(0,streamIdx).replace(/\n/g,'<br>')+'<span class="streaming-cursor" id="streamCursor"></span>';document.getElementById('streamBody').scrollTop=document.getElementById('streamBody').scrollHeight;}else{clearTimeout(streamTimer);bubble.innerHTML=streamFullText.replace(/\n/g,'<br>')+'<div class="disclaimer">内容由AI生成，仅供参考</div>';var sendBtn=document.getElementById('sendBtnStream');sendBtn.textContent='→';sendBtn.onclick=function(){sendFromUI('inputStream');};sendBtn.disabled=true;}}
+function stopStreamingFull(){clearTimeout(streamTimer);document.getElementById('streamThink').style.display='none';var bubble=document.getElementById('streamBubble'),answer=document.getElementById('streamAnswer'),actions=document.getElementById('streamActions'),sendBtn=document.getElementById('sendBtnStream');sendBtn.textContent='→';sendBtn.onclick=function(){sendFromUI('inputStream');};sendBtn.disabled=true;if(streamIdx>0){answer.style.display='flex';actions.style.display='flex';bubble.innerHTML=streamFullText.substring(0,streamIdx).replace(/\n/g,'<br>')+'<div class="disclaimer">内容由AI生成，仅供参考</div>';}else{answer.style.display='none';actions.style.display='none';}toast('已停止生成');}
+function stopStream(){clearTimeout(streamTimer);var t=document.getElementById('streamThink');if(t)t.style.display='none';var sendBtn=document.getElementById('sendBtnStream');if(sendBtn){sendBtn.textContent='→';sendBtn.onclick=function(){sendFromUI('inputStream');};sendBtn.disabled=true;}}
+var streamStarted=false;
+document.querySelector('[data-screen="chat-qa-streaming"]').addEventListener('click',function(){if(!streamStarted){streamStarted=true;startStream();}});
+
+function toggleArt(id){var art=document.getElementById(id);art.style.display=art.style.display==='block'?'none':'block';}
+function selectVehicle(plate,model,pickerId){hideEl(pickerId);document.querySelectorAll('.vehicle-select').forEach(function(v){v.innerHTML=plate+' '+model+' <span class="arrow">▼</span>';});toast('已切换到: '+plate+' '+model);}
+function switchVeh(plate,model,pickerId){hideEl(pickerId);var body=document.getElementById('qaCompleteBody');var sys=document.createElement('div');sys.className='msg-system';sys.textContent='── 已切换到「'+plate+' '+model+'」──';body.insertBefore(sys,body.firstChild);document.querySelectorAll('.vehicle-select').forEach(function(v){v.innerHTML=plate+' '+model+' <span class="arrow">▼</span>';});toast('已切换到: '+plate+' '+model);}
+var autoVoice=false;
+function toggleAutoVoice(){autoVoice=!autoVoice;document.querySelectorAll('.auto-voice-btn').forEach(function(b){if(autoVoice){b.classList.add('on');b.textContent='\uD83D\uDD0A';}else{b.classList.remove('on');b.textContent='\uD83D\uDD07';}});if(autoVoice)toast('后续回答将自动语音播报');else toast('已关闭自动语音播报');}
+function showNetToast(){var t=document.getElementById('netToast');t.style.display='block';setTimeout(function(){t.style.display='none';},2500);}
+function toggleFB(btn){var actions=btn.parentElement.querySelectorAll('.msg-action');actions.forEach(function(a){a.classList.remove('active');});btn.classList.add('active');toast('感谢反馈');}
+function copyText(text){navigator.clipboard.writeText(text).then(function(){toast('已复制');}).catch(function(){toast('已复制');});}
+var activeVoice=null;
+function toggleVoiceInline(inlineId,btnId){var inline=document.getElementById(inlineId),btn=document.getElementById(btnId);if(inline.style.display==='flex'){inline.style.display='none';btn.classList.remove('active');btn.textContent='🔊 播报';activeVoice=null;return;}if(activeVoice&&activeVoice!==inlineId){document.getElementById(activeVoice).style.display='none';document.querySelectorAll('.msg-action.active').forEach(function(a){a.classList.remove('active');a.textContent='🔊 播报';});}inline.style.display='flex';btn.classList.add('active');btn.textContent='⏸ 播放中';activeVoice=inlineId;}
+function pauseVoiceInline(btnId){var btn=document.getElementById(btnId);btn.textContent=btn.textContent==='⏸'?'▶':'⏸';}
+function stopVoiceInline(inlineId,btnId){document.getElementById(inlineId).style.display='none';var btn=document.getElementById(btnId);if(btn){btn.classList.remove('active');btn.textContent='🔊 播报';}if(activeVoice===inlineId)activeVoice=null;}
+
+// Reject logic (shared by boundary)
+var rejectCount=0,lastQuery='',clarifyCount=0,repeatCount=0;
+var rejectSuggestions=[['如何查看车辆续航里程？','仪表盘报警灯亮了怎么办？'],['如何查看车辆保养信息？','车辆充电注意事项有哪些？'],['如何换挡？','如何调节后视镜？'],['如何实名认证？','为什么要实名认证？'],['如何查看车辆配置？','如何预约保养？']];
+function detectRejectType(q){
+  var extra={};if(q.indexOf('&clarify=')>-1){var parts=q.split('&clarify=');extra.clarify=parseInt(parts[1]);q=parts[0];}
+  if(q.indexOf('&repeat=')>-1){var parts2=q.split('&repeat=');extra.repeat=parseInt(parts2[1]);q=parts2[0];}
+  if(extra.clarify===1)return'vague1';
+  if(extra.clarify===2)return'vague2';
+  if(extra.repeat===1){repeatCount++;if(repeatCount>=3)return'repeated3';return'repeated';}
+  var lower=q.toLowerCase();
+  var safety=['政治','暴力','色情','毒品','赌博','枪支','反动','颠覆','排放造假','非法改装','超载','作弊','逃费','套牌','篡改','傻逼','傻x','傻X','垃圾','废物','没用','滚','去死','sb','cnm','tmd','操','草','fuck','妈的'];
+  var competitor=['沃尔沃','奔驰','曼恩','man','volvo','mercedes','解放','东风','重汽','陕汽','福田','哪个好','谁好','对比','比较','竞品'];
+  var complaint=['太差','质量差','垃圾车','投诉','坑人','欺骗','后悔','上当','退车','赔钱'];
+  var emergency=['刹车失灵','起火了','冒烟','撞了','故障灯全亮','失控','漏油','爆炸','着火','冒烟'];
+  var vague=['怎么办','坏了','不行','不好使','有问题','怎么回事','咋回事','咋办'];
+  var outOfKnowledge=['价格','多少钱','优惠','促销','金融方案','贷款','分期','利率','月供','保险','折扣','报价','天气','你好'];
+  var serviceError=['服务异常','超时','重试','异常'];
+  if(safety.some(function(k){return lower.includes(k)||q.includes(k);}))return'safety';
+  if(emergency.some(function(k){return lower.includes(k);}))return'emergency';
+  if(complaint.some(function(k){return lower.includes(k);}))return'complaint';
+  if(competitor.some(function(k){return lower.includes(k);}))return'competitor';
+  if(vague.some(function(k){return q.includes(k);}))return'vague0';
+  if(outOfKnowledge.some(function(k){return lower.includes(k);}))return'outOfKnowledge';
+  if(serviceError.some(function(k){return lower.includes(k);}))return'serviceError';
+  return'normal';
+}
+function getRejectResponse(type){
+  switch(type){
+    case'safety':return{text:'抱歉，这个问题我暂时无法回答。您可以换个方式问我，我很乐意为您提供帮助。',showSuggestions:true,showFAQ:false,showEscalation:false,priority:'P1'};
+    case'emergency':return{text:'请立即靠边停车，确保安全。如有紧急情况，请拨打 400-xxx-xxxx',showSuggestions:true,showFAQ:false,showEscalation:true,escText:'如有紧急情况，请立即拨打客服热线 400-xxx-xxxx',priority:'P2'};
+    case'complaint':return{text:'非常抱歉给您带来了不好的体验。建议您拨打客服热线 400-xxx-xxxx，我们将尽快为您处理。',showSuggestions:true,showFAQ:false,showEscalation:true,escText:'拨打客服热线 400-xxx-xxxx 获取人工帮助',priority:'P3'};
+    case'serviceError':return{text:'服务繁忙，请稍后重试。',showSuggestions:true,showFAQ:false,showEscalation:false,priority:'P4',showRetry:true};
+    case'vague0':return{text:'能具体描述一下是什么问题吗？例如哪个功能不会使用、哪个报警灯亮了？',showSuggestions:true,showFAQ:false,showEscalation:false,priority:'P5',clarifyRound:'第 1/2 次澄清'};
+    case'vague1':return{text:'还是不太确定您的问题。能再详细描述一下吗？比如说，是仪表盘上的哪个灯、什么颜色？',showSuggestions:true,showFAQ:false,showEscalation:false,priority:'P5',clarifyRound:'第 2/2 次澄清（已达上限）'};
+    case'vague2':return{text:'抱歉，我还是没能理解您的问题。建议您拨打客服热线 400-xxx-xxxx 咨询，或换一种方式提问。',showSuggestions:true,showFAQ:true,showEscalation:true,escText:'拨打客服热线 400-xxx-xxxx 获取人工帮助',priority:'P6（Fallback）',clarifyRound:'澄清次数已用完 → 转 Fallback'};
+    case'outOfKnowledge':return{text:'抱歉，当前知识库中暂时没有相关信息。建议您拨打客服热线 400-xxx-xxxx 咨询，或换一种方式提问。',showSuggestions:true,showFAQ:true,showEscalation:true,escText:'拨打客服热线 400-xxx-xxxx 获取人工帮助',priority:'P6'};
+    case'competitor':return{text:'每个品牌都有自己的优势，我无法对竞品做出评价。如果您想了解 Scania 车型，我很乐意为您介绍。',showSuggestions:true,showFAQ:false,showEscalation:false,priority:'P7'};
+    case'repeated':return{text:'您似乎问过类似的问题。建议您换个角度描述问题，或拨打客服热线 400-xxx-xxxx 获取帮助。',showSuggestions:true,showFAQ:false,showEscalation:true,escText:'拨打客服热线 400-xxx-xxxx 获取人工帮助',priority:'P8',repeatInfo:'相似度≥90%，连续第 '+repeatCount+' 次'};
+    case'repeated3':return{text:'您已经连续多次问过同一问题了，建议换个角度描述，或拨打客服热线 400-xxx-xxxx 获取帮助。',showSuggestions:true,showFAQ:false,showEscalation:true,escText:'拨打客服热线 400-xxx-xxxx 获取人工帮助',priority:'P8',repeatInfo:'相似度≥90%，连续≥3次（已达上限）'};
+    default:return{text:'',showSuggestions:false,showFAQ:false,showEscalation:false,priority:'P9'};
+  }
+}
+function resetReject(){rejectCount=0;lastQuery='';clarifyCount=0;repeatCount=0;}
+
+// Boundary
+function sendBoundary(q){navTo('chat-boundary');var inp=document.getElementById('inputBoundary');inp.value=q;updateSendBtn('inputBoundary','sendBtnBoundary');sendBoundaryMsg();}
+function sendBoundaryMsgFromCard(q){navTo('chat-boundary');var inp=document.getElementById('inputBoundary');inp.value=q;updateSendBtn('inputBoundary','sendBtnBoundary');sendBoundaryMsg();}
+function sendBoundaryMsg(){var inp=document.getElementById('inputBoundary');var q=inp.value.trim();if(!q)return;inp.value='';updateSendBtn('inputBoundary','sendBtnBoundary');var screen=document.getElementById('screen-chat-boundary');var body=screen.querySelector('.chat-body');var type=detectRejectType(q);var resp=getRejectResponse(type);var isNormal=(type==='normal');if(isNormal)rejectCount++;else rejectCount=0;var um=document.createElement('div');um.className='user-msg';um.innerHTML='<div class="bubble">'+q+'</div>';body.appendChild(um);var think=document.createElement('div');think.className='think-row';think.id='bt'+Date.now();think.innerHTML='<div class="ai-avatar">🤖</div><div class="ai-col"><div class="ai-name">卡车助手</div><div class="think-box"><div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div><span class="think-status">正在查找...</span></div></div>';body.appendChild(think);body.scrollTop=body.scrollHeight;var text=isNormal?'方向盘调节步骤如下：\n\n1. 找到方向盘下方的调节杆\n2. 向下推动调节杆解锁\n3. 调整方向盘到合适的高度和角度\n4. 向上拉回调节杆锁定位置\n\n推荐：方向盘上沿与肩膀齐平，手臂自然弯曲约120度。\n\n安全提示：请勿在行驶中调节方向盘。':resp.text;var showSug=resp.showSuggestions;var showFAQ=resp.showFAQ;var showEsc=resp.showEscalation;setTimeout(function(){think.remove();var aiRow=document.createElement('div');aiRow.className='ai-row';var bid='btxt'+Date.now();aiRow.innerHTML='<div class="ai-avatar">🤖</div><div class="ai-col"><div class="ai-name">卡车助手</div><div class="ai-bubble" id="'+bid+'"><span class="streaming-cursor"></span></div></div>';body.appendChild(aiRow);var idx=0;var bubble=document.getElementById(bid);var timer=setInterval(function(){if(idx<text.length){idx++;bubble.innerHTML=text.substring(0,idx)+'<span class="streaming-cursor"></span>';body.scrollTop=body.scrollHeight;}else{clearInterval(timer);bubble.innerHTML=text+'<div class="disclaimer">内容由AI生成，仅供参考</div>'+(isNormal?'<div class="source-ref"><div class="source-title">📖 参考来源</div><div class="source-item"><span class="source-idx">1</span>NEXT ERA 用户手册 · 第3.2.1章节 方向盘调节<span class="source-link" onclick="toast(\'跳转到车书第3.2.1章节\')">查看原文 ›</span></div></div>':'');var actDiv=document.createElement('div');actDiv.className='msg-actions';actDiv.innerHTML='<button class="msg-action" onclick="toggleVoiceInline(\'vi'+bid+'\',\'vb'+bid+'\')" id="vb'+bid+'">🔊 播报</button>';aiRow.querySelector('.ai-col').appendChild(actDiv);var voiceDiv=document.createElement('div');voiceDiv.className='ai-row';voiceDiv.id='vi'+bid;voiceDiv.style.display='none';voiceDiv.innerHTML='<div class="ai-avatar">🤖</div><div class="ai-col"><div class="ai-name">卡车助手</div><div class="ai-bubble">'+text.replace(/\n/g,'<br>').substring(0,60)+'...<div class="voice-inline"><span class="v-status">🔊 正在播报...</span><button class="v-btn" onclick="pauseVoiceInline(\'vp'+bid+'\')" id="vp'+bid+'">⏸</button><button class="v-btn stop" onclick="stopVoiceInline(\'vi'+bid+'\',\'vb'+bid+'\')">⏹</button></div></div></div>';body.appendChild(voiceDiv);if(showFAQ){var faqDiv=document.createElement('div');faqDiv.className='faq-module';faqDiv.style.margin='8px 0';faqDiv.innerHTML='<div class="faq-module-header">📂 您可能还想问</div><div class="faq-panel active" style="display:flex"><div class="faq-item" onclick="sendBoundarySuggestion(this.textContent.trim())"><span class="icon">?</span>如何换挡？</div><div class="faq-item" onclick="sendBoundarySuggestion(this.textContent.trim())"><span class="icon">?</span>如何调节后视镜？</div><div class="faq-item" onclick="sendBoundarySuggestion(this.textContent.trim())"><span class="icon">?</span>方向盘怎么调节？</div></div>';body.appendChild(faqDiv);}if(showSug&&!showFAQ){var rid='b'+Date.now();var sugDiv=document.createElement('div');sugDiv.className='reject-box';var sugHTML='<div class="text">您可能还想了解：</div><div class="suggestions">';var items=rejectSuggestions[rejectCount%rejectSuggestions.length];for(var i=0;i<items.length;i++){sugHTML+='<div class="suggestion" onclick="sendBoundarySuggestion(this.textContent)">'+items[i]+'</div>';}sugHTML+='</div>';sugDiv.innerHTML=sugHTML;body.appendChild(sugDiv);}if(showEsc){var escDiv=document.createElement('div');escDiv.className='escalation';escDiv.innerHTML='<div class="esc-title">📞 需要人工帮助？</div><div class="esc-text">'+resp.escText+'</div><div class="esc-phone" onclick="showEl(\'dialOverlay\')">📞 拨打客服热线</div>';body.appendChild(escDiv);}body.scrollTop=body.scrollHeight;}},60);},600);}
+function sendBoundarySuggestion(s){var inp=document.getElementById('inputBoundary');inp.value=s;updateSendBtn('inputBoundary','sendBtnBoundary');sendBoundaryMsg();}
+
+function toggleOffline(){document.querySelectorAll('.offline-banner').forEach(function(b){b.classList.toggle('show');});var label=document.getElementById('offlineToggleLabel');if(label){var isOff=document.querySelector('.offline-banner.show');label.textContent=isOff?'🟢 恢复在线':'🔴 模拟离线';}}
+
+// ===== 状态机 =====
+(function(){
+  var chat=document.getElementById('smChat'),flow=document.getElementById('smFlow'),banner=document.getElementById('smBanner');
+  var bulkBar=document.getElementById('smBulkBar'),bulkBtn=document.getElementById('smBulkBtn');
+  var netBar=document.getElementById('smNetBar'),offHint=document.getElementById('smOffHint');
+  var inputArea=document.getElementById('smInputArea'),input=document.getElementById('smInput'),sendBtn=document.getElementById('smSendBtn');
+  var feedback=document.getElementById('smFeedback'),headerDot=document.getElementById('smHeaderDot');
+  var timers=[];
+  function later(fn,ms){var t=setTimeout(fn,ms);timers.push(t);return t;}
+  function clearT(){timers.forEach(clearTimeout);timers=[];}
+  function fToast(msg){feedback.textContent=msg;feedback.style.display='block';feedback.classList.add('show');later(function(){feedback.classList.remove('show');later(function(){feedback.style.display='none';},300);},1500);}
+  function setFlow(steps,idx){flow.style.display='flex';flow.innerHTML=steps.map(function(s,i){var c='sm-fstep';if(i<idx)c+=' on';else if(i===idx)c+=s.indexOf('Failed')>-1?' warn':' on';var a=i<steps.length-1?'<span class="sm-arrow">→</span>':'';return'<span class="'+c+'">'+s+'</span>'+a;}).join('');}
+
+  function setOffline(on){
+    if(on){netBar.style.display='block';offHint.style.display='none';inputArea.classList.add('offline');input.disabled=true;sendBtn.disabled=true;input.placeholder='网络不可用，无法发送消息';headerDot.style.background='var(--danger)';}
+    else{netBar.style.display='none';inputArea.classList.remove('offline');input.disabled=false;sendBtn.disabled=false;input.placeholder='在这里输入你的问题...';headerDot.style.background='var(--gold)';offHint.style.display='block';later(function(){offHint.style.display='none';},3000);}
+  }
+  function setAIThinking(v){
+    if(inputArea.classList.contains('offline'))return;
+    input.disabled=v;sendBtn.disabled=v;input.placeholder=v?'AI 正在思考中...':'在这里输入你的问题...';
+  }
+  function scroll(){chat.scrollTop=chat.scrollHeight;}
+  function reset(){
+    clearT();chat.innerHTML='';flow.style.display='none';banner.style.display='none';bulkBar.style.display='none';
+    netBar.style.display='none';offHint.style.display='none';inputArea.classList.remove('offline');
+    setAIThinking(false);input.value='';input.placeholder='在这里输入你的问题...';
+    headerDot.style.background='var(--gold)';
+  }
+
+  function addUser(state,text,cls){
+    var d=document.createElement('div');d.className='user-msg';if(cls)d.classList.add(cls);
+    if(state==='failed'){
+      d.innerHTML='<div class="bubble failed">'+text+'</div>';
+      chat.appendChild(d);
+      var err=document.createElement('div');err.className='error-msg';
+      err.innerHTML='⚠️ 发送失败，<span class="retry" onclick="window._smRetry(this)">点击重试</span> <span class="sm-edit-btn" onclick="window._smEdit(this)">编辑</span>';
+      chat.appendChild(err);scroll();return d;
+    }
+    d.innerHTML='<div class="bubble">'+text+'</div>';
+    chat.appendChild(d);scroll();return d;
+  }
+  function transitionSentToFailed(el,text){
+    var b=el.querySelector('.bubble');if(b)b.classList.add('sm-bubble-failing');
+    later(function(){el.remove();addUser('failed',text);},500);
+  }
+  function addWaiting(){
+    var d=document.createElement('div');d.className='think-row';d.id='smWaiting';
+    d.innerHTML='<div class="ai-avatar">🤖</div><div class="ai-col"><div class="ai-name">卡车助手</div><div class="think-box"><div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div><span class="think-status">AI 正在思考...</span></div></div>';
+    chat.appendChild(d);scroll();return d;
+  }
+  function addStream(text,cb){
+    var d=document.createElement('div');d.className='ai-row';d.id='smStream';
+    d.innerHTML='<div class="ai-avatar">🤖</div><div class="ai-col"><div class="ai-name">卡车助手</div><div class="ai-bubble"><span id="smStxt"></span><span class="streaming-cursor" id="smCur"></span></div></div>';
+    chat.appendChild(d);scroll();
+    var b=d.querySelector('.ai-bubble'),el=document.getElementById('smStxt'),cur=document.getElementById('smCur'),i=0;
+    var t=setInterval(function(){if(i<text.length){i++;el.textContent=text.substring(0,i);scroll();}else{clearInterval(t);if(cur)cur.remove();if(cb)cb(d);}},40);return d;
+  }
+  function addCompleted(text,sug){
+    var d=document.createElement('div');d.className='ai-row';
+    var sugHTML='';if(sug){sugHTML='<div class="quick-follow"><div class="qf-title">💡 你可能还想问</div><div class="qf-item" onclick="window._smSug(this)">VIN码一般在车辆的什么位置？</div><div class="qf-item" onclick="window._smSug(this)">如何通过VIN码查询保养记录？</div><div class="qf-item" onclick="window._smSug(this)">VIN码的第几位代表生产年份？</div></div>';}
+    d.innerHTML='<div class="ai-avatar">🤖</div><div class="ai-col"><div class="ai-name">卡车助手</div><div class="ai-bubble"><div>'+text+'</div><div class="source-ref"><div class="source-title">📖 参考来源</div><div class="source-item"><span class="source-idx">1</span>NEXT ERA 用户手册 · 第3.2.1章节<span class="source-link" onclick="fToast(\'查看原文：Scania 车辆手册 V3.2\')">查看原文 ›</span></div><div class="source-item"><span class="source-idx">2</span>NEXT ERA 用户手册 · 第3.2 驾驶舱操作<span class="source-link" onclick="fToast(\'查看原文：技术公告 2024-003\')">查看原文 ›</span></div></div><div class="disclaimer">内容由AI生成，仅供参考</div></div>'+sugHTML+'</div>';
+    var acts=document.createElement('div');acts.className='msg-actions';
+    acts.innerHTML='<button class="msg-action" onclick="window._smLike(this)">👍 有帮助<span class="sm-scope-tbd">TBD</span></button><button class="msg-action" onclick="window._smDislike(this)">👎 没帮助<span class="sm-scope-tbd">TBD</span></button><button class="msg-action" onclick="window._smCopy(this)">📋 复制<span class="sm-scope-tbd">TBD</span></button><button class="msg-action" onclick="window._smAudio(this)" style="color:var(--gold)">🔊 语音播报</button>';
+    chat.appendChild(d);chat.appendChild(acts);scroll();return d;
+  }
+
+  window._smLike=function(b){var p=b.parentElement;var l=p.children[0],d=p.children[1];if(b.classList.contains('active')){b.classList.remove('active');fToast('已取消点赞');}else{b.classList.add('active');d.classList.remove('active');fToast('感谢反馈！已标记为有帮助');}};
+  window._smDislike=function(b){var p=b.parentElement;var l=p.children[0],d=p.children[1];if(b.classList.contains('active')){b.classList.remove('active');fToast('已取消点踩');}else{b.classList.add('active');l.classList.remove('active');fToast('感谢反馈，我们会持续优化');}};
+  window._smCopy=function(b){var t=b.closest('.ai-row').querySelector('.ai-bubble div').textContent;navigator.clipboard.writeText(t).then(function(){fToast('已复制到剪贴板');})['catch'](function(){fToast('复制失败');});};
+  window._smAudio=function(b){if(b._playing){b._playing=false;b.textContent='🔊 语音播报';b.style.color='var(--gold)';fToast('语音播报已停止');}else{b._playing=true;b.textContent='🔉 播放中';b.style.color='var(--gold)';fToast('正在语音播报...');later(function(){b._playing=false;b.textContent='🔊 语音播报';b.style.color='var(--gold)';},3000);}};
+  window._smRetry=function(btn){var r=btn.closest('.user-msg');if(!r)return;var t=r.querySelector('.bubble').textContent;var en=r.nextElementSibling;r.remove();if(en&&en.classList.contains('error-msg'))en.remove();addUser('sent',t);fToast('重试成功！');};
+  window._smEdit=function(btn){var r=btn.closest('.user-msg');var t=r.querySelector('.bubble').textContent;var en=r.nextElementSibling;r.remove();if(en&&en.classList.contains('error-msg'))en.remove();input.value=t;fToast('已进入 Draft 编辑态 · 输入框回填: '+t);};
+  window._smSug=function(el){var t=el.textContent;addUser('sent',t);var w=addWaiting();later(function(){if(w.parentNode)w.remove();addStream('这是关于"'+t+'"的回答。根据系统记录，相关信息已为您整理完毕。',function(d){d.remove();addCompleted('这是关于"'+t+'"的回答。根据系统记录，相关信息已为您整理完毕。',false);});},1200);};
+
+  // === 完整流转 ===
+  function demoFull(){
+    reset();setAIThinking(true);banner.style.display='block';
+    banner.innerHTML='<strong>完整流转：</strong>User Sent → AI Waiting → Streaming → Completed → Suggested Q → Archived';
+    setFlow(['User Sent','AI Waiting','AI Streaming','AI Completed','Suggested Q','Archived'],0);
+    addUser('sent','我的VIN码是多少？');
+    var s=function(i,fn){later(function(){setFlow(['User Sent','AI Waiting','AI Streaming','AI Completed','Suggested Q','Archived'],i);if(fn)fn();},i*1000+400);};
+    s(0);s(1,function(){var w=addWaiting();s(2,function(){w.remove();addStream('您的VIN码通常可以在前挡风玻璃左下角、驾驶座车门内侧铭牌以及车辆行驶证上找到。',function(d){s(3,function(){d.remove();setAIThinking(false);addCompleted('您的VIN码通常可以在前挡风玻璃左下角、驾驶座车门内侧铭牌以及车辆行驶证上找到。',true);s(4);s(5);});});});});
+  }
+  // === User 状态集 ===
+  function demoUser(){
+    reset();setAIThinking(true);banner.style.display='block';
+    banner.innerHTML='<strong>User Message：</strong>Sent → Failed → Archived（点击发送即展示 Sent，失败则过渡到 Failed）';
+    setFlow(['Sent','Failed','Archived'],0);
+    var s1=addUser('sent','消息1：正常发送成功');
+    later(function(){setFlow(['Sent','Failed','Archived'],1);transitionSentToFailed(s1,'消息2：发送失败（模拟后端异常）');setAIThinking(false);},1500);
+    later(function(){setFlow(['Sent','Failed','Archived'],2);addUser('archived','消息3：历史消息');},3500);
+  }
+  // === AI 状态集 ===
+  function demoAI(){
+    reset();setAIThinking(true);banner.style.display='block';
+    banner.innerHTML='<strong>AI Message：</strong>Waiting → Streaming → Completed → Archived（点赞/点踩仅为 UI 事件，不产生状态变化）';
+    setFlow(['Waiting','Streaming','Completed','Archived'],0);
+    var w=addWaiting();
+    later(function(){setFlow(['Waiting','Streaming','Completed','Archived'],1);w.remove();addStream('您的VIN码可以在前挡风玻璃左下角、驾驶座车门内侧铭牌以及车辆行驶证上找到。',function(d){later(function(){setFlow(['Waiting','Streaming','Completed','Archived'],2);d.remove();setAIThinking(false);addCompleted('您的VIN码可以在前挡风玻璃左下角、驾驶座车门内侧铭牌以及车辆行驶证上找到。',false);},500);later(function(){setFlow(['Waiting','Streaming','Completed','Archived'],3);},4000);});},600);
+  }
+  // === 连续快速发送（含 AI 串行回复） ===
+  function demoRapid(){
+    reset();setAIThinking(true);banner.style.display='block';
+    banner.innerHTML='<strong>连续快速发送：</strong>用户在第1条触发 AI 前连发3条 → 3条均展示为 Sent → AI 串行处理 → 每条后跟 Waiting→Streaming→Completed。';
+    setFlow(['Sent×3','AI#1 Wait','AI#1 Stream','AI#1 Done','AI#2 Wait','AI#2 Stream','AI#2 Done','AI#3 Wait','AI#3 Stream','AI#3 Done'],0);
+    var msgs=['我的VIN码是多少？','帮我查一下保养记录','最近的维修站在哪？'];
+    var replies=['您的VIN码可以在前挡风玻璃左下角、驾驶座车门内侧铭牌以及车辆行驶证上找到。','保养记录可通过Scania Connect APP或授权服务站查询，建议每3万公里进行一次常规保养。','最近的授权服务站在上海市浦东新区金桥路1888号，联系电话021-xxxx-xxxx。'];
+    // 快速发送3条
+    var si=0;msgs.forEach(function(t,i){later(function(){addUser('sent',t);setFlow(['Sent×3','AI#1 Wait','AI#1 Stream','AI#1 Done','AI#2 Wait','AI#2 Stream','AI#2 Done','AI#3 Wait','AI#3 Stream','AI#3 Done'],i);},i*400);});
+    // AI 串行回复，每条间隔3s
+    function aiReply(idx){
+      if(idx>=3){setAIThinking(false);return;}
+      var fi=1+idx*3;
+      later(function(){setFlow(['Sent×3','AI#1 Wait','AI#1 Stream','AI#1 Done','AI#2 Wait','AI#2 Stream','AI#2 Done','AI#3 Wait','AI#3 Stream','AI#3 Done'],fi);var w=addWaiting();},1200+idx*3500);
+      later(function(){setFlow(['Sent×3','AI#1 Wait','AI#1 Stream','AI#1 Done','AI#2 Wait','AI#2 Stream','AI#2 Done','AI#3 Wait','AI#3 Stream','AI#3 Done'],fi+1);var w=document.getElementById('smWaiting');if(w)w.remove();addStream(replies[idx],function(d){later(function(){setFlow(['Sent×3','AI#1 Wait','AI#1 Stream','AI#1 Done','AI#2 Wait','AI#2 Stream','AI#2 Done','AI#3 Wait','AI#3 Stream','AI#3 Done'],fi+2);d.remove();addCompleted(replies[idx],idx===2);if(idx<2)aiReply(idx+1);else setAIThinking(false);},600);});},2200+idx*3500);
+    }
+    later(function(){aiReply(0);},2000);
+  }
+  // === Failed 后编辑 → AI 回复闭环 ===
+  function demoEdit(){
+    reset();setAIThinking(false);banner.style.display='block';
+    banner.innerHTML='<strong>Failed 后编辑：</strong>点击"编辑" → Failed 移除 → 输入框回填 Draft → 自动发送 → Sent → AI 回复闭环。';
+    setFlow(['Failed','Draft','Sent','AI Waiting','Streaming','Completed'],0);
+    addUser('failed','我的VIN码是多少？');
+    // 模拟点击编辑
+    later(function(){setFlow(['Failed','Draft','Sent','AI Waiting','Streaming','Completed'],1);
+      var r=chat.querySelector('.user-msg');var en=r.nextElementSibling;
+      if(r)r.remove();if(en&&en.classList.contains('error-msg'))en.remove();
+      input.value='我的VIN码是多少？';fToast('已进入 Draft 编辑态');
+    },1500);
+    // 模拟修改后点击发送
+    later(function(){setFlow(['Failed','Draft','Sent','AI Waiting','Streaming','Completed'],2);
+      input.value='';addUser('sent','我的VIN码是多少？（重新发送）');setAIThinking(true);
+    },3000);
+    // AI 回复
+    later(function(){setFlow(['Failed','Draft','Sent','AI Waiting','Streaming','Completed'],3);var w=addWaiting();},4000);
+    later(function(){setFlow(['Failed','Draft','Sent','AI Waiting','Streaming','Completed'],4);w=document.getElementById('smWaiting');if(w)w.remove();addStream('您的VIN码可以在前挡风玻璃左下角、驾驶座车门内侧铭牌以及车辆行驶证上找到。',function(d){later(function(){setFlow(['Failed','Draft','Sent','AI Waiting','Streaming','Completed'],5);d.remove();setAIThinking(false);addCompleted('您的VIN码可以在前挡风玻璃左下角、驾驶座车门内侧铭牌以及车辆行驶证上找到。',true);banner.innerHTML='<strong>Failed 后编辑：</strong>闭环完成。Failed → Draft → Sent → AI Waiting → Streaming → Completed。';},600);});},5200);
+  }
+  // === Failed 后发新消息 → AI 回复闭环 ===
+  function demoNewSend(){
+    reset();setAIThinking(false);banner.style.display='block';
+    banner.innerHTML='<strong>Failed 后发新消息：</strong>Failed 保留 → 新消息 Sent → AI 回答新消息（闭环）。';
+    setFlow(['Failed保留','新消息Sent','AI Waiting','Streaming','Completed'],0);
+    addUser('failed','我的VIN码是多少？');
+    // 自动发送新消息
+    later(function(){setFlow(['Failed保留','新消息Sent','AI Waiting','Streaming','Completed'],1);addUser('sent','帮我查一下最近的保养记录');setAIThinking(true);},1500);
+    // AI 回复
+    later(function(){setFlow(['Failed保留','新消息Sent','AI Waiting','Streaming','Completed'],2);var w=addWaiting();},2500);
+    later(function(){setFlow(['Failed保留','新消息Sent','AI Waiting','Streaming','Completed'],3);w=document.getElementById('smWaiting');if(w)w.remove();addStream('保养记录可通过Scania Connect APP或授权服务站查询，建议每3万公里进行一次常规保养。',function(d){later(function(){setFlow(['Failed保留','新消息Sent','AI Waiting','Streaming','Completed'],4);d.remove();setAIThinking(false);addCompleted('保养记录可通过Scania Connect APP或授权服务站查询，建议每3万公里进行一次常规保养。',true);banner.innerHTML='<strong>Failed 后发新消息：</strong>闭环完成。Failed 保留，新消息获得 AI 回复。';},600);});},3700);
+  }
+  // === 多条 Failed → 重试 → AI 回复闭环 ===
+  function demoBulk(){
+    reset();setAIThinking(false);banner.style.display='block';bulkBar.style.display='flex';
+    banner.innerHTML='<strong>多条 Failed：</strong>弱网期间 3 条消息失败 → 一键重试全部成功 → 每条后跟 AI 回复（闭环）。';
+    setFlow(['Failed×3','重试Sent','AI#1','AI#2','AI#3 Done'],0);
+    var msgs=['我的VIN码是多少？','帮我查一下保养记录','最近的维修站在哪？'];
+    var replies=['您的VIN码可以在前挡风玻璃左下角找到。','保养记录可通过APP或服务站查询。','最近的服务站在浦东金桥路1888号。'];
+    msgs.forEach(function(t){addUser('failed',t);});
+    bulkBtn.onclick=function(){
+      bulkBtn.disabled=true;bulkBtn.textContent='重试中...';setFlow(['Failed×3','重试Sent','AI#1','AI#2','AI#3 Done'],1);
+      var all=chat.querySelectorAll('.user-msg');var cnt=0;
+      all.forEach(function(r,i){
+        var t=r.querySelector('.bubble').textContent;var en=r.nextElementSibling;
+        later(function(){r.remove();if(en&&en.classList.contains('error-msg'))en.remove();addUser('sent',t);cnt++;
+          if(cnt===all.length){bulkBar.style.display='none';banner.innerHTML='<strong>多条 Failed：</strong>全部重试成功，AI 开始回复。';
+            // AI 串行回复
+            function aiReply(idx){if(idx>=3){setAIThinking(false);setFlow(['Failed×3','重试Sent','AI#1','AI#2','AI#3 Done'],4);banner.innerHTML='<strong>多条 Failed：</strong>闭环完成。3条全部重试成功并获得 AI 回复。';return;}
+              later(function(){setFlow(['Failed×3','重试Sent','AI#1','AI#2','AI#3 Done'],2+idx);var w=addWaiting();},idx*2500);
+              later(function(){var w=document.getElementById('smWaiting');if(w)w.remove();addStream(replies[idx],function(d){later(function(){d.remove();addCompleted(replies[idx],idx===2);aiReply(idx+1);},600);});},1200+idx*2500);
+            }
+            later(function(){aiReply(0);},500);
+          }
+        },i*500);
+      });
+    };
+  }
+
+  // === 发送后断网 ===
+  function demoOffSend(){
+    reset();setAIThinking(false);banner.style.display='block';
+    banner.innerHTML='<strong>发送后断网：</strong>消息已展示为 Sent → 后端返回失败 → Sent 过渡为 Failed → 网络断开 → 输入框冻结。';
+    input.value='我的VIN码是多少？';
+    sendBtn.onclick=function(){var t=input.value.trim();if(!t)return;input.value='';
+      setFlow(['Sent','Sent→Failed','离线','输入冻结','恢复','可重试'],0);
+      var s1=addUser('sent',t);
+      later(function(){setFlow(['Sent','Sent→Failed','离线','输入冻结','恢复','可重试'],1);transitionSentToFailed(s1,t);},1200);
+      later(function(){setFlow(['Sent','Sent→Failed','离线','输入冻结','恢复','可重试'],2);setOffline(true);banner.innerHTML='<strong>发送后断网：</strong>消息发送失败，网络断开，输入框冻结。';},2200);
+      later(function(){setFlow(['Sent','Sent→Failed','离线','输入冻结','恢复','可重试'],3);},3200);
+      later(function(){setFlow(['Sent','Sent→Failed','离线','输入冻结','恢复','可重试'],4);setOffline(false);banner.innerHTML='<strong>发送后断网：</strong>网络恢复，Failed 消息保留，可点击重试。';},6200);
+      later(function(){setFlow(['Sent','Sent→Failed','离线','输入冻结','恢复','可重试'],5);},7200);
+      sendBtn.onclick=null;};
+  }
+  // === 空闲断网 ===
+  function demoOffIdle(){
+    reset();setAIThinking(false);banner.style.display='block';
+    banner.innerHTML='<strong>空闲时断网：</strong>无消息发送中，网络断开 → 输入框直接冻结，历史消息正常展示。';
+    addUser('archived','帮我查一下车辆信息');addCompleted('好的，请提供您的VIN码，我帮您查询车辆信息。',false);
+    setFlow(['正常','断网','输入冻结','恢复'],0);
+    later(function(){setFlow(['正常','断网','输入冻结','恢复'],1);setOffline(true);banner.innerHTML='<strong>空闲时断网：</strong>输入框禁用，发送按钮灰色，用户完全无法发消息。历史消息仍可浏览。';},2000);
+    later(function(){setFlow(['正常','断网','输入冻结','恢复'],2);},3000);
+    later(function(){setFlow(['正常','断网','输入冻结','恢复'],3);setOffline(false);banner.innerHTML='<strong>空闲时断网：</strong>网络恢复 → 输入框恢复可用 → 绿色提示 3 秒消失。';},6000);
+  }
+  // === 断网恢复 ===
+  function demoOffRecover(){
+    reset();setAIThinking(false);banner.style.display='block';
+    banner.innerHTML='<strong>断网后恢复：</strong>离线期间用户看到 Failed 消息 → 网络恢复 → 点击重试 → Sent → AI Waiting → Streaming → Completed。';
+    addUser('failed','我的VIN码是多少？');setOffline(true);
+    setFlow(['离线','恢复','重试','AI Waiting','Streaming','Completed'],0);
+    later(function(){setFlow(['离线','恢复','重试','AI Waiting','Streaming','Completed'],1);setOffline(false);banner.innerHTML='<strong>断网后恢复：</strong>网络恢复 → 点击 Failed 消息的"重新发送"。';},2000);
+    later(function(){setFlow(['离线','恢复','重试','AI Waiting','Streaming','Completed'],2);
+      var r=chat.querySelector('.user-msg');if(r){var t=r.querySelector('.bubble').textContent;var en=r.nextElementSibling;r.remove();if(en&&en.classList.contains('error-msg'))en.remove();addUser('sent',t);
+        later(function(){setFlow(['离线','恢复','重试','AI Waiting','Streaming','Completed'],3);var w=addWaiting();
+          later(function(){setFlow(['离线','恢复','重试','AI Waiting','Streaming','Completed'],4);w.remove();addStream('您的VIN码可以在前挡风玻璃左下角、驾驶座车门内侧铭牌以及车辆行驶证上找到。',function(d){later(function(){setFlow(['离线','恢复','重试','AI Waiting','Streaming','Completed'],5);d.remove();setAIThinking(false);addCompleted('您的VIN码可以在前挡风玻璃左下角、驾驶座车门内侧铭牌以及车辆行驶证上找到。',true);banner.innerHTML='<strong>断网后恢复：</strong>重试成功 → AI 正常回答 → 完整流转完成。';},600);});},500);},1000);
+    }},3500);
+  }
+
+  var demos={full:demoFull,user:demoUser,ai:demoAI,rapid:demoRapid,edit:demoEdit,newsend:demoNewSend,bulk:demoBulk,offsend:demoOffSend,offidle:demoOffIdle,offrecover:demoOffRecover};
+  var map={'flow-full':'full','flow-user':'user','flow-ai':'ai','edge-rapid':'rapid','edge-edit':'edit','edge-newsend':'newsend','edge-bulk':'bulk','off-send':'offsend','off-idle':'offidle','off-recover':'offrecover'};
+  document.querySelectorAll('.sm-tabs').forEach(function(tabs){tabs.addEventListener('click',function(e){if(e.target.classList.contains('sm-tab')){tabs.querySelectorAll('.sm-tab').forEach(function(t){t.classList.remove('active');});e.target.classList.add('active');var k=map[e.target.dataset.sm];if(k&&demos[k])demos[k]();}});});
+  demos.full();
+})();
+function showPrivacy(){navTo('modals');showEl('privacyOverlay');}
+document.addEventListener('click',function(e){if(!e.target.closest('.vehicle-picker')&&!e.target.closest('.vehicle-select')){hideAllMenus();}});
+</script>
+</div>
+</body>
+</html>

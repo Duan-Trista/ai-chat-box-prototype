@@ -1,5 +1,7 @@
-node_modules/
+product-management/
+.opencode/
+opencode.json
+*.xlsx
+*.pdf
 .DS_Store
 Thumbs.db
-*.tmp
-~$*

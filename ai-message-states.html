@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Message 状态原型</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: #F0F2F5; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+  h1 { font-size: 20px; color: #1F1F1F; margin-bottom: 8px; }
+  .section-label { font-size: 12px; color: #999; margin-bottom: 6px; letter-spacing: 1px; text-transform: uppercase; }
+
+  .tabs { display: flex; gap: 4px; margin-bottom: 8px; background: #E8E8E8; border-radius: 10px; padding: 4px; flex-wrap: wrap; justify-content: center; }
+  .tab { padding: 7px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; border: none; background: transparent; color: #666; transition: all 0.2s; font-weight: 500; white-space: nowrap; }
+  .tab.active { background: #FFF; color: #1677FF; box-shadow: 0 1px 3px rgba(0,0,0,0.08); } .tab:hover:not(.active) { color: #333; }
+  .tab.offline-tab { color: #FF4D4F; } .tab.offline-tab.active { background: #FFF; color: #FF4D4F; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+
+  .phone { width: 390px; height: 700px; background: #FFF; border-radius: 36px; box-shadow: 0 8px 40px rgba(0,0,0,0.12); overflow: hidden; display: flex; flex-direction: column; }
+  .phone-header { height: 48px; background: #FFF; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid #F0F0F0; font-size: 15px; font-weight: 600; color: #1F1F1F; flex-shrink: 0; }
+  .phone-header .dot { width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  .phone-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; background: #FAFAFA; }
+  .msg-list { flex: 1; display: flex; flex-direction: column; gap: 12px; padding-bottom: 8px; }
+
+  .user-msg { display: flex; flex-direction: column; align-items: flex-end; }
+  .user-bubble { max-width: 72%; padding: 10px 14px; border-radius: 16px 16px 4px 16px; font-size: 14px; line-height: 1.5; word-break: break-word; background: #1677FF; color: #FFF; }
+  .time-right { font-size: 11px; color: #999; margin-top: 4px; padding: 0 4px; }
+  .state-label { font-size: 11px; color: #999; margin-bottom: 4px; padding: 0 4px; font-weight: 500; letter-spacing: 0.5px; }
+
+  .ai-msg { display: flex; flex-direction: column; align-items: flex-start; }
+  .ai-bubble { max-width: 82%; padding: 12px 14px; border-radius: 16px 16px 16px 4px; font-size: 14px; line-height: 1.6; word-break: break-word; background: #FFF; color: #333; box-shadow: 0 1px 3px rgba(0,0,0,0.06); position: relative; }
+  .state-label-ai { margin-left: 4px; }
+
+  .waiting-container { background: #FFF; padding: 14px 16px; border-radius: 16px 16px 16px 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); display: flex; align-items: center; gap: 10px; max-width: 82%; }
+  .waiting-dots { display: flex; gap: 4px; } .waiting-dot { width: 8px; height: 8px; border-radius: 50%; background: #1677FF; }
+  @keyframes dotBounce { 0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; } 40% { transform: scale(1); opacity: 1; } }
+  .waiting-dot:nth-child(1) { animation: dotBounce 1.4s ease-in-out infinite; }
+  .waiting-dot:nth-child(2) { animation: dotBounce 1.4s 0.2s ease-in-out infinite; }
+  .waiting-dot:nth-child(3) { animation: dotBounce 1.4s 0.4s ease-in-out infinite; }
+  .waiting-text { font-size: 13px; color: #999; }
+
+  .streaming-cursor { display: inline-block; width: 2px; height: 16px; background: #1677FF; margin-left: 2px; vertical-align: text-bottom; animation: cursorBlink 0.8s ease-in-out infinite; }
+  @keyframes cursorBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+  .answer-footer { margin-top: 10px; padding-top: 10px; border-top: 1px solid #F0F0F0; display: flex; flex-direction: column; gap: 8px; }
+  .source-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .source-tag { font-size: 11px; color: #1677FF; background: #F0F5FF; padding: 3px 8px; border-radius: 10px; cursor: pointer; } .source-tag:hover { background: #D6E4FF; }
+  .answer-actions { display: flex; gap: 12px; align-items: center; }
+  .action-btn { font-size: 12px; color: #999; cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 12px; transition: all 0.2s; border: none; background: transparent; }
+  .action-btn:hover { color: #1677FF; background: #F0F5FF; }
+  .action-btn.liked { color: #1677FF; font-weight: 600; }
+  .action-btn.disliked { color: #FF4D4F; font-weight: 600; }
+  .audio-btn { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #1677FF; cursor: pointer; padding: 4px 8px; border-radius: 12px; background: #F0F5FF; border: none; } .audio-btn:hover { background: #D6E4FF; }
+
+  .suggested-section { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .suggested-label { font-size: 11px; color: #BBB; margin-bottom: 2px; }
+  .suggested-item { font-size: 13px; color: #1677FF; background: #F0F5FF; padding: 8px 12px; border-radius: 12px; cursor: pointer; text-align: left; border: 1px solid #E0EAFF; transition: all 0.2s; word-break: break-word; } .suggested-item:hover { background: #D6E4FF; border-color: #1677FF; }
+
+  .input-area { border-top: 1px solid #F0F0F0; padding: 12px 16px; display: flex; gap: 10px; align-items: center; flex-shrink: 0; background: #FFF; }
+  .input-box { flex: 1; height: 40px; border-radius: 20px; border: 1px solid #E0E0E0; padding: 0 16px; font-size: 14px; outline: none; color: #333; background: #F5F5F5; }
+  .input-box:focus { border-color: #1677FF; background: #FFF; }
+  .send-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: #1677FF; color: #FFF; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .send-btn:disabled { background: #B0D0FF; cursor: not-allowed; }
+  .input-box:disabled { background: #F0F0F0; color: #BBB; cursor: not-allowed; }
+
+  .network-bar { background: #FFF2F0; border-bottom: 1px solid #FFCCC7; padding: 8px 16px; font-size: 12px; color: #FF4D4F; display: flex; align-items: center; gap: 8px; flex-shrink: 0; animation: slideDown 0.3s ease-out; }
+  @keyframes slideDown { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .input-area.offline .input-box { background: #F5F5F5; color: #CCC; border-color: #E8E8E8; }
+  .input-area.offline .input-box::placeholder { color: #CCC; }
+  .input-area.offline .send-btn { background: #E8E8E8; color: #CCC; cursor: not-allowed; }
+  .offline-hint { text-align: center; font-size: 12px; color: #52C41A; padding: 6px 0 0 0; flex-shrink: 0; }
+
+  .toast { position: absolute; top: 60px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.72); color: #FFF; font-size: 13px; padding: 8px 20px; border-radius: 20px; z-index: 10; pointer-events: none; opacity: 0; transition: opacity 0.3s; } .toast.show { opacity: 1; }
+  .scenario-banner { background: #FFF7E6; border: 1px solid #FFD591; border-radius: 8px; padding: 8px 12px; font-size: 12px; color: #AD6800; margin-bottom: 8px; line-height: 1.5; flex-shrink: 0; } .scenario-banner strong { color: #D46B08; }
+  .feedback-toast { position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%); background: #333; color: #FFF; font-size: 12px; padding: 6px 14px; border-radius: 14px; z-index: 10; pointer-events: none; opacity: 0; transition: opacity 0.3s; } .feedback-toast.show { opacity: 1; }
+
+  .wrapper { position: relative; display: flex; justify-content: center; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .msg-enter { animation: fadeIn 0.3s ease-out; }
+</style>
+</head>
+<body>
+
+<h1>AI Message 状态原型（3 状态：Waiting / Streaming / Completed）</h1>
+
+<div class="tabs" id="tabs">
+  <button class="tab active" data-state="waiting">Waiting</button>
+  <button class="tab" data-state="streaming">Streaming</button>
+  <button class="tab" data-state="completed">Completed</button>
+  <button class="tab" data-state="archived">Archived</button>
+  <button class="tab" data-state="suggested">Suggested Question</button>
+  <button class="tab" data-state="flow">完整流转</button>
+  <button class="tab offline-tab" data-state="offline">无网络</button>
+</div>
+
+<div class="wrapper">
+  <div class="phone" id="phone">
+    <div class="phone-header"><span class="dot" id="headerDot" style="background:#52C41A;"></span> AI 智能助手</div>
+    <div class="toast" id="toast"></div>
+    <div class="feedback-toast" id="feedbackToast"></div>
+    <div class="phone-body" id="phoneBody">
+      <div class="network-bar" id="networkBar" style="display:none;"><span style="width:16px;height:16px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;">!</span> 当前网络不可用，请检查网络连接后重试</div>
+      <div class="scenario-banner" id="scenarioBanner" style="display:none;"></div>
+      <div class="msg-list" id="msgList"></div>
+      <div class="offline-hint" id="offlineHint" style="display:none;">网络连接已恢复，可以继续提问</div>
+      <div class="input-area" id="inputArea"><input class="input-box" id="inputBox" placeholder="在这里输入你的问题..." /><button class="send-btn" id="sendBtn">➤</button></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const msgList = document.getElementById('msgList'), inputBox = document.getElementById('inputBox'), sendBtn = document.getElementById('sendBtn');
+  const toast = document.getElementById('toast'), feedbackToast = document.getElementById('feedbackToast'), scenarioBanner = document.getElementById('scenarioBanner');
+  const networkBar = document.getElementById('networkBar'), offlineHint = document.getElementById('offlineHint'), inputArea = document.getElementById('inputArea');
+  const headerDot = document.getElementById('headerDot'), tabs = document.getElementById('tabs');
+
+  let timers = []; let streamT = null;
+  function later(fn, ms) { const t = setTimeout(fn, ms); timers.push(t); return t; }
+  function clearAllTimers() { timers.forEach(clearTimeout); timers = []; if (streamT) { clearInterval(streamT); streamT = null; } }
+  function showToast(msg) { toast.textContent = msg; toast.classList.add('show'); later(() => toast.classList.remove('show'), 1800); }
+  function fToast(msg) { feedbackToast.textContent = msg; feedbackToast.classList.add('show'); later(() => feedbackToast.classList.remove('show'), 1500); }
+  function timeNow() { const d = new Date(); return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0'); }
+  function scroll() { msgList.scrollTop = msgList.scrollHeight; }
+
+  function setOffline(on) {
+    if (on) { networkBar.style.display = 'flex'; offlineHint.style.display = 'none'; inputArea.classList.add('offline'); inputBox.disabled = true; sendBtn.disabled = true; inputBox.placeholder = '网络不可用，无法发送消息'; headerDot.style.background = '#FF4D4F'; }
+    else { networkBar.style.display = 'none'; inputArea.classList.remove('offline'); inputBox.disabled = false; sendBtn.disabled = false; inputBox.placeholder = '在这里输入你的问题...'; headerDot.style.background = '#52C41A'; offlineHint.style.display = 'block'; later(() => { offlineHint.style.display = 'none'; }, 3000); }
+  }
+  function setInputDisabled(v) { if (inputArea.classList.contains('offline')) return; inputBox.disabled = v; sendBtn.disabled = v; inputBox.placeholder = v ? 'AI 正在思考中...' : '在这里输入你的问题...'; }
+  function resetAll() { clearAllTimers(); msgList.innerHTML = ''; scenarioBanner.style.display = 'none'; networkBar.style.display = 'none'; offlineHint.style.display = 'none'; inputArea.classList.remove('offline'); setInputDisabled(false); inputBox.value = ''; }
+
+  function renderUserMsg(text) { const d = document.createElement('div'); d.className = 'user-msg msg-enter'; d.innerHTML = `<div class="user-bubble">${text}</div><div class="time-right">${timeNow()}</div>`; msgList.appendChild(d); scroll(); return d; }
+  function renderWaiting() { const d = document.createElement('div'); d.className = 'ai-msg msg-enter'; d.id = 'waiting-msg'; d.innerHTML = `<div class="state-label state-label-ai">WAITING</div><div class="waiting-container"><div class="waiting-dots"><div class="waiting-dot"></div><div class="waiting-dot"></div><div class="waiting-dot"></div></div><span class="waiting-text">AI 正在思考...</span></div>`; msgList.appendChild(d); scroll(); return d; }
+  function renderStreaming(text, onDone) { const d = document.createElement('div'); d.className = 'ai-msg msg-enter'; d.id = 'streaming-msg'; d.innerHTML = `<div class="state-label state-label-ai">STREAMING</div><div class="ai-bubble"><span id="sText"></span><span class="streaming-cursor" id="sCursor"></span></div>`; msgList.appendChild(d); scroll(); const el = document.getElementById('sText'), cur = document.getElementById('sCursor'); let i = 0; streamT = setInterval(() => { if (i < text.length) { el.textContent += text[i]; i++; scroll(); } else { clearInterval(streamT); streamT = null; if (cur) cur.remove(); if (onDone) onDone(d); } }, 40); return d; }
+  function renderCompleted(text, withSuggested) { const d = document.createElement('div'); d.className = 'ai-msg msg-enter'; let sug = withSuggested ? `<div class="suggested-section"><div class="suggested-label">你可能还想问：</div><div class="suggested-item" onclick="doSuggested(this)">VIN码一般在车辆的什么位置？</div><div class="suggested-item" onclick="doSuggested(this)">如何通过VIN码查询保养记录？</div><div class="suggested-item" onclick="doSuggested(this)">VIN码的第几位代表生产年份？</div></div>` : ''; d.innerHTML = `<div class="state-label state-label-ai">COMPLETED</div><div class="ai-bubble"><div>${text}</div><div class="answer-footer"><div class="source-row"><span style="font-size:11px;color:#BBB;">来源：</span><span class="source-tag" onclick="showToast('查看原文：Scania 车辆手册 V3.2')">车辆手册</span><span class="source-tag" onclick="showToast('查看原文：技术公告 2024-003')">技术公告</span></div><div class="answer-actions"><button class="action-btn" onclick="doLike(this)">👍 有帮助</button><button class="action-btn" onclick="doDislike(this)">👎 没帮助</button><button class="action-btn" onclick="doCopy(this)">📋 复制</button><button class="audio-btn" onclick="doAudio(this)">🔊 语音播报</button></div></div></div>${sug}<div class="time-right" style="align-self:flex-start;margin-left:4px;">${timeNow()}</div>`; msgList.appendChild(d); scroll(); return d; }
+
+  function doLike(b) { const p = b.parentElement; const l = p.children[0], d = p.children[1]; if (l.classList.contains('liked')) { l.classList.remove('liked'); fToast('已取消点赞'); } else { l.classList.add('liked'); d.classList.remove('disliked'); fToast('感谢反馈！'); } }
+  function doDislike(b) { const p = b.parentElement; const l = p.children[0], d = p.children[1]; if (d.classList.contains('disliked')) { d.classList.remove('disliked'); fToast('已取消点踩'); } else { d.classList.add('disliked'); l.classList.remove('liked'); fToast('感谢反馈'); } }
+  function doCopy(b) { const t = b.closest('.ai-bubble').querySelector('div').textContent; navigator.clipboard.writeText(t).then(() => fToast('已复制')).catch(() => fToast('复制失败')); }
+  function doAudio(b) { if (b.classList.contains('audio-playing')) { b.classList.remove('audio-playing'); b.innerHTML = '🔊 语音播报'; fToast('已停止'); } else { b.classList.add('audio-playing'); b.innerHTML = '🔉 播放中'; fToast('正在播放...'); later(() => { b.classList.remove('audio-playing'); b.innerHTML = '🔊 语音播报'; }, 3000); } }
+  function doSuggested(el) { const t = el.textContent; showToast('已发送：' + t); renderUserMsg(t); const w = renderWaiting(); later(() => { if (w.parentNode) w.remove(); renderStreaming('这是关于"' + t + '"的回答。', (d) => { d.remove(); renderCompleted('这是关于"' + t + '"的回答。', false); }); }, 1500); }
+
+  const answerText = '您的VIN码可以在前挡风玻璃左下角、驾驶座车门内侧铭牌以及车辆行驶证上找到。VIN码由17位字符组成，包含车辆制造商、车型、发动机类型等信息。';
+
+  function demoWaiting() { resetAll(); setInputDisabled(true); renderUserMsg('我的VIN码是多少？'); renderWaiting(); showToast('Waiting — AI 正在等待返回结果'); }
+  function demoStreaming() { resetAll(); setInputDisabled(true); renderUserMsg('我的VIN码是多少？'); renderStreaming(answerText, (d) => { later(() => { d.remove(); setInputDisabled(false); renderCompleted(answerText, true); showToast('Streaming 完成 → Completed'); }, 500); }); showToast('Streaming — 内容逐步生成'); }
+  function demoCompleted() { resetAll(); setInputDisabled(false); renderUserMsg('我的VIN码是多少？'); renderCompleted(answerText, true); showToast('Completed — 完整回答 + 操作区 + 快捷追问'); }
+  function demoArchived() { resetAll(); setInputDisabled(false); renderUserMsg('我的VIN码是多少？'); const d = document.createElement('div'); d.className = 'ai-msg msg-enter'; d.innerHTML = `<div class="ai-bubble"><div>${answerText}</div><div class="answer-footer"><div class="source-row"><span style="font-size:11px;color:#BBB;">来源：</span><span class="source-tag">车辆手册</span><span class="source-tag">技术公告</span></div><div class="answer-actions"><button class="action-btn" onclick="doLike(this)">👍 有帮助</button><button class="action-btn" onclick="doDislike(this)">👎 没帮助</button><button class="action-btn" onclick="doCopy(this)">📋 复制</button><button class="audio-btn" onclick="doAudio(this)">🔊 语音播报</button></div></div></div><div class="time-right" style="align-self:flex-start;margin-left:4px;">${timeNow()}</div>`; msgList.appendChild(d); scroll(); showToast('Archived — 与 Completed 视觉一致'); }
+  function demoSuggested() { resetAll(); setInputDisabled(false); scenarioBanner.style.display = 'block'; scenarioBanner.innerHTML = '<strong>Suggested Question：</strong>回答完成后展示快捷追问。点击推荐问题 → 自动发送 → 创建新 User Message。'; renderUserMsg('VIN码是什么？'); renderCompleted('VIN（Vehicle Identification Number）是车辆识别代号。', true); showToast('点击快捷追问试试'); }
+  function demoFlow() { resetAll(); setInputDisabled(true); scenarioBanner.style.display = 'block'; scenarioBanner.innerHTML = '<strong>完整流转：</strong>Waiting → Streaming → Completed → Suggested Question → Archived（点赞/点踩仅为操作事件，不产生状态变化）'; renderUserMsg('我的VIN码是多少？'); later(() => { const w = renderWaiting(); showToast('Waiting'); later(() => { w.remove(); renderStreaming(answerText, (d) => { later(() => { d.remove(); setInputDisabled(false); renderCompleted(answerText, true); showToast('Completed + Suggested Q'); }, 600); }); showToast('Streaming'); }, 1500); }, 800); }
+  function demoOffline() { resetAll(); setInputDisabled(false); scenarioBanner.style.display = 'block'; scenarioBanner.innerHTML = '<strong>无网络：</strong>AI 回答完成后网络断开 → 输入框冻结 → 历史消息可浏览 → 恢复后可继续提问。'; renderUserMsg('我的VIN码是多少？'); renderCompleted(answerText, false); later(() => { setOffline(true); scenarioBanner.innerHTML = '<strong>无网络：</strong>网络断开，输入框禁用，禁止发送消息。历史消息仍可浏览。'; }, 2000); later(() => { setOffline(false); scenarioBanner.innerHTML = '<strong>无网络：</strong>网络恢复，输入框可用。'; }, 6000); }
+
+  tabs.addEventListener('click', e => { if (e.target.classList.contains('tab')) { tabs.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); e.target.classList.add('active'); switch (e.target.dataset.state) { case 'waiting': demoWaiting(); break; case 'streaming': demoStreaming(); break; case 'completed': demoCompleted(); break; case 'archived': demoArchived(); break; case 'suggested': demoSuggested(); break; case 'flow': demoFlow(); break; case 'offline': demoOffline(); break; } } });
+  demoWaiting();
+</script>
+</body>
+</html>

@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>User Message 状态原型</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: #F0F2F5; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+  h1 { font-size: 20px; color: #1F1F1F; margin-bottom: 8px; }
+  .section-label { font-size: 12px; color: #999; margin-bottom: 6px; letter-spacing: 1px; text-transform: uppercase; }
+
+  .tabs { display: flex; gap: 4px; margin-bottom: 8px; background: #E8E8E8; border-radius: 10px; padding: 4px; flex-wrap: wrap; justify-content: center; }
+  .tab { padding: 7px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; border: none; background: transparent; color: #666; transition: all 0.2s; font-weight: 500; white-space: nowrap; }
+  .tab.active { background: #FFF; color: #1677FF; box-shadow: 0 1px 3px rgba(0,0,0,0.08); } .tab:hover:not(.active) { color: #333; }
+  .tab.edge { color: #FA8C16; } .tab.edge.active { background: #FFF; color: #FA8C16; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .tab.offline-tab { color: #FF4D4F; } .tab.offline-tab.active { background: #FFF; color: #FF4D4F; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+
+  .phone { width: 390px; height: 680px; background: #FFF; border-radius: 36px; box-shadow: 0 8px 40px rgba(0,0,0,0.12); overflow: hidden; display: flex; flex-direction: column; }
+  .phone-header { height: 48px; background: #FFF; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid #F0F0F0; font-size: 15px; font-weight: 600; color: #1F1F1F; flex-shrink: 0; }
+  .phone-header .dot { width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  .phone-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; background: #FAFAFA; }
+  .msg-list { flex: 1; display: flex; flex-direction: column; gap: 12px; padding-bottom: 8px; }
+
+  .user-msg { display: flex; flex-direction: column; align-items: flex-end; }
+  .bubble { max-width: 72%; padding: 10px 14px; border-radius: 16px 16px 4px 16px; font-size: 14px; line-height: 1.5; word-break: break-word; }
+  .bubble-sent { background: #1677FF; color: #FFF; }
+  .bubble-failed { background: #FFF1F0; color: #333; opacity: 0.6; }
+  .bubble-archived { background: #1677FF; color: #FFF; }
+  .time { font-size: 11px; color: #999; margin-top: 4px; padding: 0 4px; }
+  .state-label { font-size: 11px; color: #999; margin-bottom: 4px; padding: 0 4px; font-weight: 500; letter-spacing: 0.5px; }
+
+  .failed-row { display: flex; align-items: flex-start; gap: 8px; }
+  .failed-icon { width: 20px; height: 20px; flex-shrink: 0; margin-top: 10px; background: #FF4D4F; border-radius: 50%; color: #FFF; font-size: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+  .failed-actions { display: flex; gap: 8px; margin-top: 6px; margin-right: 4px; }
+  .retry-btn, .edit-btn { font-size: 12px; cursor: pointer; user-select: none; font-weight: 500; padding: 4px 10px; border-radius: 12px; border: none; background: transparent; }
+  .retry-btn { color: #1677FF; } .retry-btn:hover { background: #E6F0FF; }
+  .edit-btn { color: #999; } .edit-btn:hover { background: #F5F5F5; }
+
+  @keyframes sentToFailed { from { background: #1677FF; color: #FFF; opacity: 1; } to { background: #FFF1F0; color: #333; opacity: 0.6; } }
+  .bubble-failing { animation: sentToFailed 0.5s ease-out forwards; }
+
+  .input-area { border-top: 1px solid #F0F0F0; padding: 12px 16px; display: flex; gap: 10px; align-items: center; flex-shrink: 0; background: #FFF; }
+  .input-box { flex: 1; height: 40px; border-radius: 20px; border: 1px solid #E0E0E0; padding: 0 16px; font-size: 14px; outline: none; color: #333; background: #F5F5F5; }
+  .input-box:focus { border-color: #1677FF; background: #FFF; }
+  .send-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: #1677FF; color: #FFF; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .send-btn:disabled { background: #B0D0FF; cursor: not-allowed; }
+  .input-box:disabled { background: #F0F0F0; color: #BBB; cursor: not-allowed; }
+
+  .network-bar { background: #FFF2F0; border-bottom: 1px solid #FFCCC7; padding: 8px 16px; font-size: 12px; color: #FF4D4F; display: flex; align-items: center; gap: 8px; flex-shrink: 0; animation: slideDown 0.3s ease-out; }
+  @keyframes slideDown { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .input-area.offline .input-box { background: #F5F5F5; color: #CCC; border-color: #E8E8E8; }
+  .input-area.offline .input-box::placeholder { color: #CCC; }
+  .input-area.offline .send-btn { background: #E8E8E8; color: #CCC; cursor: not-allowed; }
+  .offline-hint { text-align: center; font-size: 12px; color: #52C41A; padding: 6px 0 0 0; flex-shrink: 0; }
+
+  .toast { position: absolute; top: 60px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.72); color: #FFF; font-size: 13px; padding: 8px 20px; border-radius: 20px; z-index: 10; pointer-events: none; opacity: 0; transition: opacity 0.3s; } .toast.show { opacity: 1; }
+  .scenario-banner { background: #FFF7E6; border: 1px solid #FFD591; border-radius: 8px; padding: 8px 12px; font-size: 12px; color: #AD6800; margin-bottom: 8px; line-height: 1.5; flex-shrink: 0; } .scenario-banner strong { color: #D46B08; }
+  .bulk-retry-bar { background: #FFF; border: 1px solid #E8E8E8; border-radius: 8px; padding: 8px 12px; margin-bottom: 8px; font-size: 12px; color: #666; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .bulk-retry-btn { background: #1677FF; color: #FFF; border: none; padding: 5px 12px; border-radius: 14px; font-size: 12px; cursor: pointer; font-weight: 500; } .bulk-retry-btn:hover { background: #4096FF; } .bulk-retry-btn:disabled { background: #B0D0FF; cursor: not-allowed; }
+
+  .wrapper { position: relative; display: flex; justify-content: center; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .msg-enter { animation: fadeIn 0.3s ease-out; }
+  @keyframes slideOut { to { opacity: 0; transform: translateX(20px); max-height: 0; margin: 0; padding: 0; } }
+  .msg-remove { animation: slideOut 0.3s ease-out forwards; overflow: hidden; }
+</style>
+</head>
+<body>
+
+<h1>User Message 状态原型（3 状态：Sent / Failed / Archived）</h1>
+
+<div class="section-label">常规状态</div>
+<div class="tabs" id="tabsBasic">
+  <button class="tab active" data-state="sent">Sent</button>
+  <button class="tab" data-state="failed">Failed</button>
+  <button class="tab" data-state="archived">Archived</button>
+  <button class="tab" data-state="flow">完整流转</button>
+</div>
+
+<div class="section-label">边界场景</div>
+<div class="tabs" id="tabsEdge">
+  <button class="tab edge" data-state="edge-rapid">连续快速发送</button>
+  <button class="tab edge" data-state="edge-edit">Failed 后编辑</button>
+  <button class="tab edge" data-state="edge-newsend">Failed 后发新消息</button>
+  <button class="tab edge" data-state="edge-bulk">多条 Failed 恢复</button>
+</div>
+
+<div class="section-label">网络状态</div>
+<div class="tabs" id="tabsOffline">
+  <button class="tab offline-tab" data-state="offline">发送后断网</button>
+</div>
+
+<div class="wrapper">
+  <div class="phone" id="phone">
+    <div class="phone-header"><span class="dot" style="background:#52C41A;"></span> AI 智能助手</div>
+    <div class="toast" id="toast"></div>
+    <div class="phone-body" id="phoneBody">
+      <div class="network-bar" id="networkBar" style="display:none;"><span style="width:16px;height:16px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;">!</span> 当前网络不可用，请检查网络连接后重试</div>
+      <div class="scenario-banner" id="scenarioBanner" style="display:none;"></div>
+      <div class="bulk-retry-bar" id="bulkBar" style="display:none;"><span>3 条消息发送失败</span><button class="bulk-retry-btn" id="bulkRetryBtn">一键重试</button></div>
+      <div class="msg-list" id="msgList"></div>
+      <div class="offline-hint" id="offlineHint" style="display:none;">网络连接已恢复，可以继续提问</div>
+      <div class="input-area" id="inputArea"><input class="input-box" id="inputBox" placeholder="在这里输入你的问题..." /><button class="send-btn" id="sendBtn">➤</button></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const msgList = document.getElementById('msgList'), inputBox = document.getElementById('inputBox'), sendBtn = document.getElementById('sendBtn');
+  const toast = document.getElementById('toast'), scenarioBanner = document.getElementById('scenarioBanner'), bulkBar = document.getElementById('bulkBar');
+  const bulkRetryBtn = document.getElementById('bulkRetryBtn'), networkBar = document.getElementById('networkBar'), offlineHint = document.getElementById('offlineHint');
+  const inputArea = document.getElementById('inputArea'), tabsBasic = document.getElementById('tabsBasic'), tabsEdge = document.getElementById('tabsEdge'), tabsOffline = document.getElementById('tabsOffline');
+
+  let timers = [];
+  function later(fn, ms) { const t = setTimeout(fn, ms); timers.push(t); return t; }
+  function clearAllTimers() { timers.forEach(clearTimeout); timers = []; }
+  function showToast(msg) { toast.textContent = msg; toast.classList.add('show'); later(() => toast.classList.remove('show'), 1800); }
+  function timeNow() { const d = new Date(); return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0'); }
+  function scroll() { msgList.scrollTop = msgList.scrollHeight; }
+
+  function setOffline(on) {
+    if (on) { networkBar.style.display = 'flex'; offlineHint.style.display = 'none'; inputArea.classList.add('offline'); inputBox.disabled = true; sendBtn.disabled = true; inputBox.placeholder = '网络不可用，无法发送消息'; }
+    else { networkBar.style.display = 'none'; inputArea.classList.remove('offline'); inputBox.disabled = false; sendBtn.disabled = false; inputBox.placeholder = '在这里输入你的问题...'; offlineHint.style.display = 'block'; later(() => { offlineHint.style.display = 'none'; }, 3000); }
+  }
+  function setInputDisabled(v) { if (inputArea.classList.contains('offline')) return; inputBox.disabled = v; sendBtn.disabled = v; inputBox.placeholder = v ? 'AI 正在思考中...' : '在这里输入你的问题...'; }
+  function clearAll() { clearAllTimers(); msgList.innerHTML = ''; scenarioBanner.style.display = 'none'; bulkBar.style.display = 'none'; networkBar.style.display = 'none'; offlineHint.style.display = 'none'; inputArea.classList.remove('offline'); setInputDisabled(false); inputBox.value = ''; }
+  function resetAndRenderHistory() { clearAll(); }
+
+  function renderMessage(state, text, extraClass) {
+    const div = document.createElement('div'); div.className = 'user-msg ' + (extraClass || 'msg-enter');
+    if (state === 'failed') {
+      div.innerHTML = `<div class="failed-row"><div class="failed-icon">!</div><div style="display:flex;flex-direction:column;align-items:flex-end;"><div class="state-label">FAILED</div><div class="bubble bubble-failed">${text}</div><div class="failed-actions"><button class="retry-btn" onclick="handleRetry(this)">重新发送</button><button class="edit-btn" onclick="handleEdit(this)">编辑</button></div></div></div>`;
+    } else {
+      const bc = state === 'sent' ? 'bubble-sent' : 'bubble-archived';
+      div.innerHTML = `<div class="state-label">${state.toUpperCase()}</div><div class="bubble ${bc}">${text}</div><div class="time">${timeNow()}</div>`;
+    }
+    msgList.appendChild(div); scroll(); return div;
+  }
+
+  function demoSent() { resetAndRenderHistory(); setInputDisabled(false); renderMessage('sent', '我的VIN码是多少？'); showToast('消息直接展示为 Sent（点击发送后立即显示）'); }
+  function demoFailed() { resetAndRenderHistory(); setInputDisabled(false); renderMessage('failed', '我的VIN码是多少？'); showToast('发送失败（后端异常、网络断开等导致）'); }
+  function demoArchived() { resetAndRenderHistory(); setInputDisabled(false); renderMessage('archived', '我的VIN码是多少？'); showToast('历史消息（与 Sent 视觉一致）'); }
+  function demoFlow() {
+    resetAndRenderHistory();
+    const s1 = renderMessage('sent', '我的VIN码是多少？'); showToast('Sent → 消息立即展示');
+    later(() => { const b = s1.querySelector('.bubble-sent'); if (b) b.classList.add('bubble-failing'); later(() => { s1.remove(); renderMessage('failed', '我的VIN码是多少？'); showToast('Sent → Failed（后端返回异常）'); }, 500); }, 1500);
+    later(() => { renderMessage('archived', '帮我查一下保养记录'); showToast('Archived → 历史消息'); }, 3500);
+  }
+
+  // 边界场景
+  function demoEdgeRapid() { resetAndRenderHistory(); setInputDisabled(true); scenarioBanner.style.display = 'block'; scenarioBanner.innerHTML = '<strong>连续快速发送：</strong>3 条消息点击发送 → 立即展示为 Sent → 互不干扰。'; ['我的VIN码是多少？','帮我查一下保养记录','最近的维修站在哪？'].forEach((t, i) => later(() => { renderMessage('sent', t); if (i === 2) setInputDisabled(false); }, i * 500)); }
+  function demoEdgeEdit() { resetAndRenderHistory(); setInputDisabled(false); scenarioBanner.style.display = 'block'; scenarioBanner.innerHTML = '<strong>Failed 后编辑：</strong>点击"编辑" → Failed 移除 → 输入框回填 → Draft 态。'; renderMessage('failed', '我的VIN码是多少？'); showToast('点击"编辑"按钮试试'); }
+  function demoEdgeNewSend() {
+    resetAndRenderHistory(); setInputDisabled(false); scenarioBanner.style.display = 'block';
+    scenarioBanner.innerHTML = '<strong>Failed 后发新消息：</strong>Failed 保留 → 输入新消息 → 新消息直接展示为 Sent。';
+    renderMessage('failed', '我的VIN码是多少？'); inputBox.value = '帮我查一下最近的保养记录'; inputBox.focus();
+    sendBtn.onclick = function() { const t = inputBox.value.trim(); if (!t) return; inputBox.value = ''; renderMessage('sent', t); scenarioBanner.innerHTML = '<strong>Failed 后发新消息：</strong>新消息直接展示为 Sent，原 Failed 保留。'; sendBtn.onclick = null; };
+  }
+  function demoEdgeBulk() {
+    resetAndRenderHistory(); setInputDisabled(false); scenarioBanner.style.display = 'block'; bulkBar.style.display = 'flex';
+    scenarioBanner.innerHTML = '<strong>多条 Failed：</strong>弱网期间 3 条消息失败，可逐条重试或一键重试。';
+    ['我的VIN码是多少？','帮我查一下保养记录','最近的维修站在哪？'].forEach(t => renderMessage('failed', t, ''));
+    bulkRetryBtn.onclick = function() { bulkRetryBtn.disabled = true; bulkRetryBtn.textContent = '重试中...';
+      const all = msgList.querySelectorAll('.user-msg'); let cnt = 0;
+      all.forEach((row, i) => { const t = row.querySelector('.bubble').textContent; later(() => { row.classList.add('msg-remove'); later(() => { row.remove(); renderMessage('sent', t); cnt++; if (cnt === all.length) { bulkBar.style.display = 'none'; setInputDisabled(false); scenarioBanner.innerHTML = '<strong>多条 Failed：</strong>全部重试完成。'; } }, 300); }, i * 500); });
+    };
+  }
+
+  function handleRetry(btn) { const row = btn.closest('.user-msg'); if (!row) return; const t = row.querySelector('.bubble').textContent; row.classList.add('msg-remove'); later(() => { row.remove(); renderMessage('sent', t); showToast('重试成功！'); }, 300); }
+  function handleEdit(btn) { const row = btn.closest('.user-msg'); const t = row.querySelector('.bubble').textContent; row.classList.add('msg-remove'); later(() => { row.remove(); inputBox.value = t; inputBox.focus(); inputBox.select(); showToast('已进入 Draft 编辑态'); }, 300); }
+
+  // 发送后断网
+  function demoOffline() {
+    resetAndRenderHistory(); setInputDisabled(false); scenarioBanner.style.display = 'block';
+    scenarioBanner.innerHTML = '<strong>发送后断网：</strong>消息已展示为 Sent → 后端返回失败 → Sent 过渡为 Failed → 网络断开 → 输入框冻结。';
+    inputBox.value = '我的VIN码是多少？';
+    sendBtn.onclick = function() { const t = inputBox.value.trim(); if (!t) return; inputBox.value = '';
+      const s = renderMessage('sent', t); showToast('Sent → 等待后端确认');
+      later(() => { const b = s.querySelector('.bubble-sent'); if (b) b.classList.add('bubble-failing'); later(() => { s.remove(); renderMessage('failed', t); showToast('后端返回失败 → Failed'); }, 500); }, 1500);
+      later(() => { setOffline(true); scenarioBanner.innerHTML = '<strong>发送后断网：</strong>消息失败，网络断开，输入框冻结。'; }, 2500);
+      later(() => { setOffline(false); scenarioBanner.innerHTML = '<strong>发送后断网：</strong>网络恢复，Failed 保留可重试。'; }, 6000);
+      sendBtn.onclick = null;
+    };
+  }
+
+  function deactivateAll() { [tabsBasic, tabsEdge, tabsOffline].forEach(t => t.querySelectorAll('.tab').forEach(b => b.classList.remove('active'))); }
+  tabsBasic.addEventListener('click', e => { if (e.target.classList.contains('tab')) { deactivateAll(); e.target.classList.add('active'); switch (e.target.dataset.state) { case 'sent': demoSent(); break; case 'failed': demoFailed(); break; case 'archived': demoArchived(); break; case 'flow': demoFlow(); break; } } });
+  tabsEdge.addEventListener('click', e => { if (e.target.classList.contains('tab')) { deactivateAll(); e.target.classList.add('active'); switch (e.target.dataset.state) { case 'edge-rapid': demoEdgeRapid(); break; case 'edge-edit': demoEdgeEdit(); break; case 'edge-newsend': demoEdgeNewSend(); break; case 'edge-bulk': demoEdgeBulk(); break; } } });
+  tabsOffline.addEventListener('click', e => { if (e.target.classList.contains('tab')) { deactivateAll(); e.target.classList.add('active'); switch (e.target.dataset.state) { case 'offline': demoOffline(); break; } } });
+
+  demoSent();
+</script>
+</body>
+</html>

@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>消息状态机原型（User + AI 统一）</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: #F0F2F5; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+  h1 { font-size: 20px; color: #1F1F1F; margin-bottom: 8px; }
+  .section-label { font-size: 12px; color: #999; margin-bottom: 6px; letter-spacing: 1px; text-transform: uppercase; }
+
+  .tabs { display: flex; gap: 4px; margin-bottom: 8px; background: #E8E8E8; border-radius: 10px; padding: 4px; flex-wrap: wrap; justify-content: center; }
+  .tab { padding: 7px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; border: none; background: transparent; color: #666; transition: all 0.2s; font-weight: 500; white-space: nowrap; }
+  .tab.active { background: #FFF; color: #1677FF; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .tab:hover:not(.active) { color: #333; }
+  .tab.edge { color: #FA8C16; } .tab.edge.active { background: #FFF; color: #FA8C16; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .tab.offline-tab { color: #FF4D4F; } .tab.offline-tab.active { background: #FFF; color: #FF4D4F; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .tab.flow-tab { color: #52C41A; } .tab.flow-tab.active { background: #FFF; color: #52C41A; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+
+  .phone { width: 390px; height: 700px; background: #FFF; border-radius: 36px; box-shadow: 0 8px 40px rgba(0,0,0,0.12); overflow: hidden; display: flex; flex-direction: column; }
+  .phone-header { height: 48px; background: #FFF; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid #F0F0F0; font-size: 15px; font-weight: 600; color: #1F1F1F; flex-shrink: 0; }
+  .phone-header .dot { width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  .phone-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; background: #FAFAFA; }
+  .msg-list { flex: 1; display: flex; flex-direction: column; gap: 12px; padding-bottom: 8px; }
+
+  /* User Message */
+  .user-msg { display: flex; flex-direction: column; align-items: flex-end; }
+  .user-bubble { max-width: 72%; padding: 10px 14px; border-radius: 16px 16px 4px 16px; font-size: 14px; line-height: 1.5; word-break: break-word; }
+  .bubble-sent { background: #1677FF; color: #FFF; }
+  .bubble-failed { background: #FFF1F0; color: #333; opacity: 0.6; }
+  .bubble-archived { background: #1677FF; color: #FFF; }
+  .time-right { font-size: 11px; color: #999; margin-top: 4px; padding: 0 4px; }
+  .state-label { font-size: 11px; color: #999; margin-bottom: 4px; padding: 0 4px; font-weight: 500; letter-spacing: 0.5px; }
+
+  .failed-row { display: flex; align-items: flex-start; gap: 8px; }
+  .failed-icon { width: 20px; height: 20px; flex-shrink: 0; margin-top: 10px; background: #FF4D4F; border-radius: 50%; color: #FFF; font-size: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+  .failed-actions { display: flex; gap: 8px; margin-top: 6px; margin-right: 4px; }
+  .retry-btn, .edit-btn { font-size: 12px; cursor: pointer; user-select: none; font-weight: 500; padding: 4px 10px; border-radius: 12px; border: none; background: transparent; }
+  .retry-btn { color: #1677FF; } .retry-btn:hover { background: #E6F0FF; }
+  .edit-btn { color: #999; } .edit-btn:hover { background: #F5F5F5; }
+
+  /* Sent → Failed 过渡 */
+  @keyframes sentToFailed { from { background: #1677FF; color: #FFF; opacity: 1; } to { background: #FFF1F0; color: #333; opacity: 0.6; } }
+  .bubble-failing { animation: sentToFailed 0.5s ease-out forwards; }
+
+  /* AI Message */
+  .ai-msg { display: flex; flex-direction: column; align-items: flex-start; }
+  .ai-bubble { max-width: 82%; padding: 12px 14px; border-radius: 16px 16px 16px 4px; font-size: 14px; line-height: 1.6; word-break: break-word; background: #FFF; color: #333; box-shadow: 0 1px 3px rgba(0,0,0,0.06); position: relative; }
+  .state-label-ai { margin-left: 4px; }
+
+  .waiting-container { background: #FFF; padding: 14px 16px; border-radius: 16px 16px 16px 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); display: flex; align-items: center; gap: 10px; max-width: 82%; }
+  .waiting-dots { display: flex; gap: 4px; } .waiting-dot { width: 8px; height: 8px; border-radius: 50%; background: #1677FF; }
+  @keyframes dotBounce { 0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; } 40% { transform: scale(1); opacity: 1; } }
+  .waiting-dot:nth-child(1) { animation: dotBounce 1.4s ease-in-out infinite; }
+  .waiting-dot:nth-child(2) { animation: dotBounce 1.4s 0.2s ease-in-out infinite; }
+  .waiting-dot:nth-child(3) { animation: dotBounce 1.4s 0.4s ease-in-out infinite; }
+  .waiting-text { font-size: 13px; color: #999; }
+
+  .streaming-cursor { display: inline-block; width: 2px; height: 16px; background: #1677FF; margin-left: 2px; vertical-align: text-bottom; animation: cursorBlink 0.8s ease-in-out infinite; }
+  @keyframes cursorBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+  .answer-footer { margin-top: 10px; padding-top: 10px; border-top: 1px solid #F0F0F0; display: flex; flex-direction: column; gap: 8px; }
+  .source-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .source-tag { font-size: 11px; color: #1677FF; background: #F0F5FF; padding: 3px 8px; border-radius: 10px; cursor: pointer; } .source-tag:hover { background: #D6E4FF; }
+  .answer-actions { display: flex; gap: 12px; align-items: center; }
+  .action-btn { font-size: 12px; color: #999; cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 12px; transition: all 0.2s; border: none; background: transparent; }
+  .action-btn:hover { color: #1677FF; background: #F0F5FF; }
+  .action-btn.liked { color: #1677FF; font-weight: 600; }
+  .action-btn.disliked { color: #FF4D4F; font-weight: 600; }
+  .audio-btn { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #1677FF; cursor: pointer; padding: 4px 8px; border-radius: 12px; background: #F0F5FF; border: none; } .audio-btn:hover { background: #D6E4FF; }
+
+  .suggested-section { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .suggested-label { font-size: 11px; color: #BBB; margin-bottom: 2px; }
+  .suggested-item { font-size: 13px; color: #1677FF; background: #F0F5FF; padding: 8px 12px; border-radius: 12px; cursor: pointer; text-align: left; border: 1px solid #E0EAFF; transition: all 0.2s; word-break: break-word; } .suggested-item:hover { background: #D6E4FF; border-color: #1677FF; }
+
+  .input-area { border-top: 1px solid #F0F0F0; padding: 12px 16px; display: flex; gap: 10px; align-items: center; flex-shrink: 0; background: #FFF; }
+  .input-box { flex: 1; height: 40px; border-radius: 20px; border: 1px solid #E0E0E0; padding: 0 16px; font-size: 14px; outline: none; color: #333; background: #F5F5F5; }
+  .input-box:focus { border-color: #1677FF; background: #FFF; }
+  .send-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: #1677FF; color: #FFF; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .send-btn:disabled { background: #B0D0FF; cursor: not-allowed; }
+  .input-box:disabled { background: #F0F0F0; color: #BBB; cursor: not-allowed; }
+
+  .network-bar { background: #FFF2F0; border-bottom: 1px solid #FFCCC7; padding: 8px 16px; font-size: 12px; color: #FF4D4F; display: flex; align-items: center; gap: 8px; flex-shrink: 0; animation: slideDown 0.3s ease-out; }
+  @keyframes slideDown { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .input-area.offline .input-box { background: #F5F5F5; color: #CCC; border-color: #E8E8E8; }
+  .input-area.offline .input-box::placeholder { color: #CCC; }
+  .input-area.offline .send-btn { background: #E8E8E8; color: #CCC; cursor: not-allowed; }
+  .offline-hint { text-align: center; font-size: 12px; color: #52C41A; padding: 6px 0 0 0; flex-shrink: 0; }
+
+  .toast { position: absolute; top: 60px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.72); color: #FFF; font-size: 13px; padding: 8px 20px; border-radius: 20px; z-index: 10; pointer-events: none; opacity: 0; transition: opacity 0.3s; } .toast.show { opacity: 1; }
+  .scenario-banner { background: #FFF7E6; border: 1px solid #FFD591; border-radius: 8px; padding: 8px 12px; font-size: 12px; color: #AD6800; margin-bottom: 8px; line-height: 1.5; flex-shrink: 0; } .scenario-banner strong { color: #D46B08; }
+  .bulk-retry-bar { background: #FFF; border: 1px solid #E8E8E8; border-radius: 8px; padding: 8px 12px; margin-bottom: 8px; font-size: 12px; color: #666; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .bulk-retry-btn { background: #1677FF; color: #FFF; border: none; padding: 5px 12px; border-radius: 14px; font-size: 12px; cursor: pointer; font-weight: 500; } .bulk-retry-btn:hover { background: #4096FF; } .bulk-retry-btn:disabled { background: #B0D0FF; cursor: not-allowed; }
+  .wrapper { position: relative; display: flex; justify-content: center; }
+  .overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.6); border-radius: 36px; display: flex; align-items: center; justify-content: center; z-index: 20; flex-direction: column; gap: 12px; }
+  .overlay-text { color: #FFF; font-size: 16px; font-weight: 600; } .overlay-btn { background: #FFF; color: #333; border: none; padding: 10px 24px; border-radius: 20px; font-size: 14px; cursor: pointer; font-weight: 500; }
+  .feedback-toast { position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%); background: #333; color: #FFF; font-size: 12px; padding: 6px 14px; border-radius: 14px; z-index: 10; pointer-events: none; opacity: 0; transition: opacity 0.3s; } .feedback-toast.show { opacity: 1; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .msg-enter { animation: fadeIn 0.3s ease-out; }
+  @keyframes slideOut { to { opacity: 0; transform: translateX(20px); max-height: 0; margin: 0; padding: 0; } }
+  .msg-remove { animation: slideOut 0.3s ease-out forwards; overflow: hidden; }
+
+  .flow-indicator { display: flex; align-items: center; gap: 4px; font-size: 11px; color: #BBB; margin-bottom: 8px; flex-wrap: wrap; flex-shrink: 0; }
+  .flow-step { padding: 2px 6px; border-radius: 4px; background: #F5F5F5; }
+  .flow-step.active { background: #1677FF; color: #FFF; }
+  .flow-step.warn { background: #FFF1F0; color: #FF4D4F; }
+  .flow-arrow { color: #CCC; }
+</style>
+</head>
+<body>
+
+<h1>消息状态机原型（User + AI 统一）</h1>
+
+<div class="section-label">正常流转</div>
+<div class="tabs" id="tabsFlow">
+  <button class="tab flow-tab active" data-state="flow-full">完整对话流转</button>
+  <button class="tab flow-tab" data-state="flow-user-states">User Message 状态集</button>
+  <button class="tab flow-tab" data-state="flow-ai-states">AI Message 状态集</button>
+</div>
+
+<div class="section-label">User Message 边界场景</div>
+<div class="tabs" id="tabsEdge">
+  <button class="tab edge" data-state="edge-rapid">连续快速发送</button>
+  <button class="tab edge" data-state="edge-edit">Failed 后编辑</button>
+  <button class="tab edge" data-state="edge-newsend">Failed 后发新消息</button>
+  <button class="tab edge" data-state="edge-bulk">多条 Failed 恢复</button>
+</div>
+
+<div class="section-label">网络状态</div>
+<div class="tabs" id="tabsOffline">
+  <button class="tab offline-tab" data-state="offline-send">发送后断网</button>
+  <button class="tab offline-tab" data-state="offline-idle">空闲时断网</button>
+  <button class="tab offline-tab" data-state="offline-recover">断网后恢复</button>
+</div>
+
+<div class="wrapper">
+  <div class="phone" id="phone">
+    <div class="phone-header"><span class="dot" id="headerDot" style="background:#52C41A;"></span> AI 智能助手</div>
+    <div class="toast" id="toast"></div>
+    <div class="feedback-toast" id="feedbackToast"></div>
+    <div class="overlay" id="overlay" style="display:none;"><div class="overlay-text">页面已关闭</div><button class="overlay-btn" id="reopenBtn">重新打开页面</button></div>
+    <div class="phone-body" id="phoneBody">
+      <div class="network-bar" id="networkBar" style="display:none;"><span style="width:16px;height:16px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;">!</span> 当前网络不可用，请检查网络连接后重试</div>
+      <div class="flow-indicator" id="flowIndicator" style="display:none;"></div>
+      <div class="scenario-banner" id="scenarioBanner" style="display:none;"></div>
+      <div class="bulk-retry-bar" id="bulkBar" style="display:none;"><span>3 条消息发送失败</span><button class="bulk-retry-btn" id="bulkRetryBtn">一键重试</button></div>
+      <div class="msg-list" id="msgList"></div>
+      <div class="offline-hint" id="offlineHint" style="display:none;">网络连接已恢复，可以继续提问</div>
+      <div class="input-area" id="inputArea"><input class="input-box" id="inputBox" placeholder="在这里输入你的问题..." /><button class="send-btn" id="sendBtn">➤</button></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const M = {
+    msgList: document.getElementById('msgList'), inputBox: document.getElementById('inputBox'), sendBtn: document.getElementById('sendBtn'),
+    toast: document.getElementById('toast'), feedbackToast: document.getElementById('feedbackToast'), overlay: document.getElementById('overlay'),
+    scenarioBanner: document.getElementById('scenarioBanner'), bulkBar: document.getElementById('bulkBar'), bulkRetryBtn: document.getElementById('bulkRetryBtn'),
+    reopenBtn: document.getElementById('reopenBtn'), networkBar: document.getElementById('networkBar'), offlineHint: document.getElementById('offlineHint'),
+    inputArea: document.getElementById('inputArea'), flowIndicator: document.getElementById('flowIndicator'), headerDot: document.getElementById('headerDot'),
+    tabsFlow: document.getElementById('tabsFlow'), tabsEdge: document.getElementById('tabsEdge'), tabsOffline: document.getElementById('tabsOffline'),
+  };
+
+  let timers = []; let streamT = null;
+  function later(fn, ms) { const t = setTimeout(fn, ms); timers.push(t); return t; }
+  function clearAllTimers() { timers.forEach(clearTimeout); timers = []; if (streamT) { clearInterval(streamT); streamT = null; } }
+  function toast(msg) { M.toast.textContent = msg; M.toast.classList.add('show'); later(() => M.toast.classList.remove('show'), 1800); }
+  function fToast(msg) { M.feedbackToast.textContent = msg; M.feedbackToast.classList.add('show'); later(() => M.feedbackToast.classList.remove('show'), 1500); }
+  function timeNow() { const d = new Date(); return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0'); }
+  function scroll() { M.msgList.scrollTop = M.msgList.scrollHeight; }
+
+  function setOffline(on) {
+    if (on) { M.networkBar.style.display = 'flex'; M.offlineHint.style.display = 'none'; M.inputArea.classList.add('offline'); M.inputBox.disabled = true; M.sendBtn.disabled = true; M.inputBox.placeholder = '网络不可用，无法发送消息'; M.headerDot.style.background = '#FF4D4F'; }
+    else { M.networkBar.style.display = 'none'; M.inputArea.classList.remove('offline'); M.inputBox.disabled = false; M.sendBtn.disabled = false; M.inputBox.placeholder = '在这里输入你的问题...'; M.headerDot.style.background = '#52C41A'; M.offlineHint.style.display = 'block'; later(() => { M.offlineHint.style.display = 'none'; }, 3000); }
+  }
+  function setInputDisabled(v) { if (M.inputArea.classList.contains('offline')) return; M.inputBox.disabled = v; M.sendBtn.disabled = v; M.inputBox.placeholder = v ? 'AI 正在思考中...' : '在这里输入你的问题...'; }
+  function fullReset() { clearAllTimers(); M.msgList.innerHTML = ''; M.overlay.style.display = 'none'; M.scenarioBanner.style.display = 'none'; M.bulkBar.style.display = 'none'; M.flowIndicator.style.display = 'none'; setOffline(false); setInputDisabled(false); M.inputBox.value = ''; }
+  function updateFlow(steps, idx) {
+    M.flowIndicator.style.display = 'flex';
+    M.flowIndicator.innerHTML = steps.map((s, i) => { let c = 'flow-step'; if (i < idx) c += ' active'; else if (i === idx) c += s.includes('Failed') ? ' warn' : ' active'; const a = i < steps.length - 1 ? '<span class="flow-arrow">→</span>' : ''; return `<span class="${c}">${s}</span>${a}`; }).join('');
+  }
+
+  // ===== User Message（3 状态：Sent / Failed / Archived）=====
+  function renderUserMsg(state, text, cls) {
+    const div = document.createElement('div'); div.className = 'user-msg ' + (cls || 'msg-enter');
+    if (state === 'failed') {
+      div.innerHTML = `<div class="failed-row"><div class="failed-icon">!</div><div style="display:flex;flex-direction:column;align-items:flex-end;"><div class="state-label">FAILED</div><div class="bubble bubble-failed">${text}</div><div class="failed-actions"><button class="retry-btn" onclick="doRetry(this)">重新发送</button><button class="edit-btn" onclick="doEdit(this)">编辑</button></div></div></div>`;
+    } else {
+      const bc = state === 'sent' ? 'bubble-sent' : 'bubble-archived';
+      div.innerHTML = `<div class="state-label">${state.toUpperCase()}</div><div class="bubble ${bc}">${text}</div><div class="time-right">${timeNow()}</div>`;
+    }
+    M.msgList.appendChild(div); scroll(); return div;
+  }
+
+  // Sent → Failed 过渡
+  function transitionSentToFailed(el, text) {
+    const bubble = el.querySelector('.bubble-sent');
+    if (bubble) bubble.classList.add('bubble-failing');
+    const t = later(() => { el.remove(); renderUserMsg('failed', text); }, 500);
+    return t;
+  }
+
+  // ===== AI Message（3 状态：Waiting / Streaming / Completed）=====
+  function renderWaiting() {
+    const div = document.createElement('div'); div.className = 'ai-msg msg-enter'; div.id = 'waiting-msg';
+    div.innerHTML = `<div class="state-label state-label-ai">WAITING</div><div class="waiting-container"><div class="waiting-dots"><div class="waiting-dot"></div><div class="waiting-dot"></div><div class="waiting-dot"></div></div><span class="waiting-text">AI 正在思考...</span></div>`;
+    M.msgList.appendChild(div); scroll(); return div;
+  }
+  function renderStreaming(text, onDone) {
+    const div = document.createElement('div'); div.className = 'ai-msg msg-enter'; div.id = 'streaming-msg';
+    div.innerHTML = `<div class="state-label state-label-ai">STREAMING</div><div class="ai-bubble"><span id="sText"></span><span class="streaming-cursor" id="sCursor"></span></div>`;
+    M.msgList.appendChild(div); scroll();
+    const el = document.getElementById('sText'), cur = document.getElementById('sCursor'); let i = 0;
+    streamT = setInterval(() => { if (i < text.length) { el.textContent += text[i]; i++; scroll(); } else { clearInterval(streamT); streamT = null; if (cur) cur.remove(); if (onDone) onDone(div); } }, 40);
+    return div;
+  }
+  function renderCompleted(text, withSuggested) {
+    const div = document.createElement('div'); div.className = 'ai-msg msg-enter';
+    let sug = withSuggested ? `<div class="suggested-section"><div class="suggested-label">你可能还想问：</div><div class="suggested-item" onclick="doSuggested(this)">VIN码一般在车辆的什么位置？</div><div class="suggested-item" onclick="doSuggested(this)">如何通过VIN码查询保养记录？</div><div class="suggested-item" onclick="doSuggested(this)">VIN码的第几位代表生产年份？</div></div>` : '';
+    div.innerHTML = `<div class="state-label state-label-ai">COMPLETED</div><div class="ai-bubble"><div>${text}</div><div class="answer-footer"><div class="source-row"><span style="font-size:11px;color:#BBB;">来源：</span><span class="source-tag" onclick="toast('查看原文：Scania 车辆手册 V3.2')">车辆手册</span><span class="source-tag" onclick="toast('查看原文：技术公告 2024-003')">技术公告</span></div><div class="answer-actions"><button class="action-btn" onclick="doLike(this)">👍 有帮助 <span style="font-size:9px;color:#BBB;">TBD</span></button><button class="action-btn" onclick="doDislike(this)">👎 没帮助 <span style="font-size:9px;color:#BBB;">TBD</span></button><button class="action-btn" onclick="doCopy(this)">📋 复制 <span style="font-size:9px;color:#BBB;">TBD</span></button><button class="audio-btn" onclick="doAudio(this)">🔊 语音播报</button></div></div></div>${sug}<div class="time-right" style="align-self:flex-start;margin-left:4px;">${timeNow()}</div>`;
+    M.msgList.appendChild(div); scroll(); return div;
+  }
+
+  // ===== 交互 =====
+  function doLike(b) { const p = b.parentElement; const l = p.children[0], d = p.children[1]; if (l.classList.contains('liked')) { l.classList.remove('liked'); fToast('已取消点赞'); } else { l.classList.add('liked'); d.classList.remove('disliked'); fToast('感谢反馈！已标记为有帮助'); } }
+  function doDislike(b) { const p = b.parentElement; const l = p.children[0], d = p.children[1]; if (d.classList.contains('disliked')) { d.classList.remove('disliked'); fToast('已取消点踩'); } else { d.classList.add('disliked'); l.classList.remove('liked'); fToast('感谢反馈，我们会持续优化'); } }
+  function doCopy(b) { const t = b.closest('.ai-bubble').querySelector('div').textContent; navigator.clipboard.writeText(t).then(() => fToast('已复制到剪贴板')).catch(() => fToast('复制失败')); }
+  function doAudio(b) { if (b.classList.contains('audio-playing')) { b.classList.remove('audio-playing'); b.innerHTML = '🔊 语音播报'; fToast('已停止'); } else { b.classList.add('audio-playing'); b.innerHTML = '🔉 播放中'; fToast('正在语音播报...'); later(() => { b.classList.remove('audio-playing'); b.innerHTML = '🔊 语音播报'; }, 3000); } }
+  function doSuggested(el) { const t = el.textContent; toast('已发送：' + t); renderUserMsg('sent', t); const w = renderWaiting(); later(() => { if (w.parentNode) w.remove(); renderStreaming('这是关于"' + t + '"的回答。根据系统记录，相关信息已为您整理完毕。', (d) => { d.remove(); renderCompleted('这是关于"' + t + '"的回答。根据系统记录，相关信息已为您整理完毕。', false); }); }, 1500); }
+  function doRetry(btn) { const row = btn.closest('.user-msg'); if (!row) return; const t = row.querySelector('.bubble').textContent; row.classList.add('msg-remove'); later(() => { row.remove(); renderUserMsg('sent', t); fToast('重试成功！'); }, 300); }
+  function doEdit(btn) { const row = btn.closest('.user-msg'); const t = row.querySelector('.bubble').textContent; row.classList.add('msg-remove'); later(() => { row.remove(); M.inputBox.value = t; M.inputBox.focus(); M.inputBox.select(); toast('已进入 Draft 编辑态'); }, 300); }
+
+  // ============ 完整对话流转 ============
+  function demoFlowFull() {
+    fullReset(); setInputDisabled(true);
+    updateFlow(['User Sent','AI Waiting','AI Streaming','AI Completed','Suggested Q','User Archived','AI Archived'], 0);
+    const s = (i, fn) => later(() => { updateFlow(['User Sent','AI Waiting','AI Streaming','AI Completed','Suggested Q','User Archived','AI Archived'], i); if (fn) fn(); }, i * 1200 + 500);
+
+    renderUserMsg('sent', '我的VIN码是多少？');
+    s(0); s(1, () => { const w = renderWaiting(); s(2, () => { w.remove(); renderStreaming('您的VIN码通常可以在前挡风玻璃左下角、驾驶座车门内侧铭牌以及车辆行驶证上找到。', (d) => { s(3, () => { d.remove(); setInputDisabled(false); renderCompleted('您的VIN码通常可以在前挡风玻璃左下角、驾驶座车门内侧铭牌以及车辆行驶证上找到。', true); s(4); s(5); s(6); }); }); }); });
+  }
+
+  // ============ User Message 状态集（Sent / Failed / Archived）============
+  function demoFlowUserStates() {
+    fullReset(); M.scenarioBanner.style.display = 'block';
+    M.scenarioBanner.innerHTML = '<strong>User Message 状态：</strong>Sent → Failed → Archived（点击发送后消息立即展示为 Sent，失败则转为 Failed）';
+    setInputDisabled(true); updateFlow(['Sent','Failed','Archived'], 0);
+
+    const s1 = renderUserMsg('sent', '消息1：正常发送成功');
+    later(() => { updateFlow(['Sent','Failed','Archived'], 1); transitionSentToFailed(s1, '消息2：发送失败（模拟后端异常）'); setInputDisabled(false); }, 1500);
+    later(() => { updateFlow(['Sent','Failed','Archived'], 2); renderUserMsg('archived', '消息3：历史消息'); }, 3500);
+  }
+
+  // ============ AI Message 状态集（Waiting / Streaming / Completed）============
+  function demoFlowAIStates() {
+    fullReset(); M.scenarioBanner.style.display = 'block';
+    M.scenarioBanner.innerHTML = '<strong>AI Message 状态：</strong>Waiting → Streaming → Completed → Archived（无 Interacted，点赞/点踩仅为操作事件）';
+    setInputDisabled(true); updateFlow(['Waiting','Streaming','Completed','Archived'], 0);
+
+    const w = renderWaiting();
+    later(() => { updateFlow(['Waiting','Streaming','Completed','Archived'], 1); w.remove();
+      renderStreaming('您的VIN码可以在前挡风玻璃左下角、驾驶座车门内侧铭牌以及车辆行驶证上找到。', (d) => {
+        later(() => { updateFlow(['Waiting','Streaming','Completed','Archived'], 2); d.remove(); setInputDisabled(false); renderCompleted('您的VIN码可以在前挡风玻璃左下角、驾驶座车门内侧铭牌以及车辆行驶证上找到。', false); }, 500);
+        later(() => { updateFlow(['Waiting','Streaming','Completed','Archived'], 3); }, 4000);
+      });
+    }, 800);
+  }
+
+  // ============ 边界场景（含 AI 闭环回复）============
+  function demoEdgeRapid() {
+    fullReset(); setInputDisabled(true); M.scenarioBanner.style.display = 'block';
+    M.scenarioBanner.innerHTML = '<strong>连续快速发送：</strong>用户在 AI 处理前连发3条 → 均展示为 Sent → AI 串行处理 → 每条后跟 Waiting→Streaming→Completed。';
+    updateFlow(['Sent×3','AI#1 Wait','AI#1 Stream','AI#1 Done','AI#2 Wait','AI#2 Done','AI#3 Done'], 0);
+    const msgs = ['我的VIN码是多少？','帮我查一下保养记录','最近的维修站在哪？'];
+    const replies = ['您的VIN码可以在前挡风玻璃左下角、驾驶座车门内侧铭牌以及车辆行驶证上找到。','保养记录可通过Scania Connect APP或授权服务站查询，建议每3万公里进行一次常规保养。','最近的服务站在上海市浦东新区金桥路1888号。'];
+    let si = 0; msgs.forEach((t, i) => later(() => { renderUserMsg('sent', t); }, i * 400));
+    function aiReply(idx) {
+      if (idx >= 3) { setInputDisabled(false); return; }
+      const fi = 1 + idx * 2;
+      later(() => { updateFlow(['Sent×3','AI#1 Wait','AI#1 Stream','AI#1 Done','AI#2 Wait','AI#2 Done','AI#3 Done'], fi); const w = renderWaiting(); }, 1200 + idx * 3000);
+      later(() => { updateFlow(['Sent×3','AI#1 Wait','AI#1 Stream','AI#1 Done','AI#2 Wait','AI#2 Done','AI#3 Done'], fi + 1); const w = document.getElementById('waiting-msg'); if (w) w.remove(); renderStreaming(replies[idx], (d) => { later(() => { d.remove(); renderCompleted(replies[idx], idx === 2); if (idx < 2) aiReply(idx + 1); else setInputDisabled(false); }, 600); }); }, 2400 + idx * 3000);
+    }
+    later(() => aiReply(0), 2000);
+  }
+
+  function demoEdgeEdit() {
+    fullReset(); setInputDisabled(false); M.scenarioBanner.style.display = 'block';
+    M.scenarioBanner.innerHTML = '<strong>Failed 后编辑：</strong>点击"编辑" → Failed 移除 → Draft → 重新发送 → AI 回复（闭环）。';
+    updateFlow(['Failed','Draft','Sent','AI Waiting','Streaming','Completed'], 0);
+    renderUserMsg('failed', '我的VIN码是多少？');
+    later(() => { updateFlow(['Failed','Draft','Sent','AI Waiting','Streaming','Completed'], 1);
+      const r = M.msgList.querySelector('.user-msg'); if (r) r.remove(); M.inputBox.value = '我的VIN码是多少？'; toast('已进入 Draft 编辑态');
+    }, 1500);
+    later(() => { updateFlow(['Failed','Draft','Sent','AI Waiting','Streaming','Completed'], 2);
+      M.inputBox.value = ''; setInputDisabled(true); renderUserMsg('sent', '我的VIN码是多少？（重新发送）');
+    }, 3000);
+    later(() => { updateFlow(['Failed','Draft','Sent','AI Waiting','Streaming','Completed'], 3); const w = renderWaiting(); }, 4000);
+    later(() => { updateFlow(['Failed','Draft','Sent','AI Waiting','Streaming','Completed'], 4);
+      const w = document.getElementById('waiting-msg'); if (w) w.remove();
+      renderStreaming('您的VIN码可以在前挡风玻璃左下角、驾驶座车门内侧铭牌以及车辆行驶证上找到。', (d) => {
+        later(() => { updateFlow(['Failed','Draft','Sent','AI Waiting','Streaming','Completed'], 5); d.remove(); setInputDisabled(false); renderCompleted('您的VIN码可以在前挡风玻璃左下角、驾驶座车门内侧铭牌以及车辆行驶证上找到。', true); M.scenarioBanner.innerHTML = '<strong>Failed 后编辑：</strong>闭环完成。Failed → Draft → Sent → AI 回复。'; }, 600);
+      });
+    }, 5200);
+  }
+
+  function demoEdgeNewSend() {
+    fullReset(); setInputDisabled(false); M.scenarioBanner.style.display = 'block';
+    M.scenarioBanner.innerHTML = '<strong>Failed 后发新消息：</strong>Failed 保留 → 新消息 Sent → AI 回答新消息（闭环）。';
+    updateFlow(['Failed保留','新Sent','AI Waiting','Streaming','Completed'], 0);
+    renderUserMsg('failed', '我的VIN码是多少？');
+    later(() => { updateFlow(['Failed保留','新Sent','AI Waiting','Streaming','Completed'], 1); setInputDisabled(true); renderUserMsg('sent', '帮我查一下最近的保养记录'); }, 1500);
+    later(() => { updateFlow(['Failed保留','新Sent','AI Waiting','Streaming','Completed'], 2); const w = renderWaiting(); }, 2500);
+    later(() => { updateFlow(['Failed保留','新Sent','AI Waiting','Streaming','Completed'], 3);
+      const w = document.getElementById('waiting-msg'); if (w) w.remove();
+      renderStreaming('保养记录可通过Scania Connect APP或授权服务站查询，建议每3万公里进行一次常规保养。', (d) => {
+        later(() => { updateFlow(['Failed保留','新Sent','AI Waiting','Streaming','Completed'], 4); d.remove(); setInputDisabled(false); renderCompleted('保养记录可通过Scania Connect APP或授权服务站查询，建议每3万公里进行一次常规保养。', true); M.scenarioBanner.innerHTML = '<strong>Failed 后发新消息：</strong>闭环完成。Failed 保留，新消息获 AI 回复。'; }, 600);
+      });
+    }, 3700);
+  }
+
+  function demoEdgeBulk() {
+    fullReset(); setInputDisabled(false); M.scenarioBanner.style.display = 'block'; M.bulkBar.style.display = 'flex';
+    M.scenarioBanner.innerHTML = '<strong>多条 Failed：</strong>弱网期间 3 条失败 → 一键重试 → 每条后跟 AI 回复（闭环）。';
+    updateFlow(['Failed×3','重试Sent','AI#1','AI#2','AI#3 Done'], 0);
+    const msgs = ['我的VIN码是多少？','帮我查一下保养记录','最近的维修站在哪？'];
+    const replies = ['您的VIN码可以在前挡风玻璃左下角找到。','保养记录可通过APP或服务站查询。','最近的服务站在浦东金桥路1888号。'];
+    msgs.forEach(t => renderUserMsg('failed', t, ''));
+    M.bulkRetryBtn.onclick = function() {
+      M.bulkRetryBtn.disabled = true; M.bulkRetryBtn.textContent = '重试中...'; updateFlow(['Failed×3','重试Sent','AI#1','AI#2','AI#3 Done'], 1);
+      const all = M.msgList.querySelectorAll('.user-msg'); let cnt = 0;
+      all.forEach((row, i) => { const t = row.querySelector('.bubble').textContent;
+        later(() => { row.classList.add('msg-remove'); later(() => { row.remove(); renderUserMsg('sent', t); cnt++;
+          if (cnt === all.length) { M.bulkBar.style.display = 'none'; M.scenarioBanner.innerHTML = '<strong>多条 Failed：</strong>全部重试成功，AI 开始回复。';
+            function aiReply(idx) { if (idx >= 3) { setInputDisabled(false); updateFlow(['Failed×3','重试Sent','AI#1','AI#2','AI#3 Done'], 4); M.scenarioBanner.innerHTML = '<strong>多条 Failed：</strong>闭环完成。3 条全部重试成功并获得 AI 回复。'; return; }
+              later(() => { updateFlow(['Failed×3','重试Sent','AI#1','AI#2','AI#3 Done'], 2 + idx); const w = renderWaiting(); }, idx * 2500);
+              later(() => { const w = document.getElementById('waiting-msg'); if (w) w.remove(); renderStreaming(replies[idx], (d) => { later(() => { d.remove(); renderCompleted(replies[idx], idx === 2); aiReply(idx + 1); }, 600); }); }, 1200 + idx * 2500);
+            }
+            later(() => aiReply(0), 500);
+          }
+        }, 300); }, i * 500);
+      });
+    };
+  }
+
+  // ============ 网络场景 ============
+  function demoOfflineSend() {
+    fullReset(); setInputDisabled(false); M.scenarioBanner.style.display = 'block';
+    M.scenarioBanner.innerHTML = '<strong>发送后断网：</strong>消息已展示为 Sent → 后端返回失败 → Sent 过渡为 Failed → 网络断开 → 输入框冻结。';
+    M.inputBox.value = '我的VIN码是多少？';
+    M.sendBtn.onclick = function() {
+      const t = M.inputBox.value.trim(); if (!t) return; M.inputBox.value = '';
+      const s = renderUserMsg('sent', t); updateFlow(['Sent','Sent→Failed','离线','输入冻结','恢复','可重试'], 0);
+      later(() => { updateFlow(['Sent','Sent→Failed','离线','输入冻结','恢复','可重试'], 1); transitionSentToFailed(s, t); }, 1200);
+      later(() => { updateFlow(['Sent','Sent→Failed','离线','输入冻结','恢复','可重试'], 2); setOffline(true); M.scenarioBanner.innerHTML = '<strong>发送后断网：</strong>消息发送失败，网络断开，输入框冻结。'; }, 2200);
+      later(() => { updateFlow(['Sent','Sent→Failed','离线','输入冻结','恢复','可重试'], 3); }, 3200);
+      later(() => { updateFlow(['Sent','Sent→Failed','离线','输入冻结','恢复','可重试'], 4); setOffline(false); M.scenarioBanner.innerHTML = '<strong>发送后断网：</strong>网络恢复，Failed 消息保留，可点击重试。'; }, 6200);
+      later(() => { updateFlow(['Sent','Sent→Failed','离线','输入冻结','恢复','可重试'], 5); }, 7200);
+      M.sendBtn.onclick = null;
+    };
+  }
+
+  function demoOfflineIdle() {
+    fullReset(); setInputDisabled(false); M.scenarioBanner.style.display = 'block';
+    M.scenarioBanner.innerHTML = '<strong>空闲时断网：</strong>无消息发送中，网络断开 → 输入框直接冻结，历史消息正常展示。';
+    renderUserMsg('archived', '帮我查一下车辆信息'); renderCompleted('好的，请提供您的VIN码。', false);
+    updateFlow(['正常','断网','输入冻结','恢复'], 0);
+    later(() => { updateFlow(['正常','断网','输入冻结','恢复'], 1); setOffline(true); M.scenarioBanner.innerHTML = '<strong>空闲时断网：</strong>输入框禁用，发送按钮灰色，历史消息仍可浏览。'; }, 2000);
+    later(() => { updateFlow(['正常','断网','输入冻结','恢复'], 2); }, 3000);
+    later(() => { updateFlow(['正常','断网','输入冻结','恢复'], 3); setOffline(false); M.scenarioBanner.innerHTML = '<strong>空闲时断网：</strong>网络恢复，输入框恢复可用。'; }, 6000);
+  }
+
+  function demoOfflineRecover() {
+    fullReset(); setInputDisabled(false); M.scenarioBanner.style.display = 'block';
+    M.scenarioBanner.innerHTML = '<strong>断网后恢复：</strong>离线期间有 Failed 消息 → 网络恢复 → 点击重试 → 重试成功 → AI 回答。';
+    renderUserMsg('failed', '我的VIN码是多少？'); setOffline(true);
+    updateFlow(['离线','恢复','重试','AI Waiting','Streaming','Completed'], 0); toast('当前离线，输入框冻结');
+
+    later(() => { updateFlow(['离线','恢复','重试','AI Waiting','Streaming','Completed'], 1); setOffline(false); M.scenarioBanner.innerHTML = '<strong>断网后恢复：</strong>网络恢复，点击 Failed 消息的"重新发送"。'; }, 2000);
+    later(() => { updateFlow(['离线','恢复','重试','AI Waiting','Streaming','Completed'], 2);
+      const row = M.msgList.querySelector('.user-msg'); if (row) { const t = row.querySelector('.bubble').textContent; row.classList.add('msg-remove');
+        later(() => { row.remove(); renderUserMsg('sent', t);
+          later(() => { updateFlow(['离线','恢复','重试','AI Waiting','Streaming','Completed'], 3); const w = renderWaiting();
+            later(() => { updateFlow(['离线','恢复','重试','AI Waiting','Streaming','Completed'], 4); w.remove();
+              renderStreaming('您的VIN码可以在前挡风玻璃左下角、驾驶座车门内侧铭牌以及车辆行驶证上找到。', (d) => {
+                later(() => { updateFlow(['离线','恢复','重试','AI Waiting','Streaming','Completed'], 5); d.remove(); setInputDisabled(false); renderCompleted('您的VIN码可以在前挡风玻璃左下角、驾驶座车门内侧铭牌以及车辆行驶证上找到。', true); M.scenarioBanner.innerHTML = '<strong>断网后恢复：</strong>重试成功，AI 正常回答。'; }, 600);
+              });
+            }, 500);
+          }, 1000);
+        }, 300);
+      }
+    }, 3500);
+  }
+
+  // ============ Tab 切换 ============
+  function deactivateAll() { [M.tabsFlow, M.tabsEdge, M.tabsOffline].forEach(t => t.querySelectorAll('.tab').forEach(b => b.classList.remove('active'))); }
+  M.tabsFlow.addEventListener('click', e => { if (e.target.classList.contains('tab')) { deactivateAll(); e.target.classList.add('active'); switch (e.target.dataset.state) { case 'flow-full': demoFlowFull(); break; case 'flow-user-states': demoFlowUserStates(); break; case 'flow-ai-states': demoFlowAIStates(); break; } } });
+  M.tabsEdge.addEventListener('click', e => { if (e.target.classList.contains('tab')) { deactivateAll(); e.target.classList.add('active'); switch (e.target.dataset.state) { case 'edge-rapid': demoEdgeRapid(); break; case 'edge-edit': demoEdgeEdit(); break; case 'edge-newsend': demoEdgeNewSend(); break; case 'edge-bulk': demoEdgeBulk(); break; } } });
+  M.tabsOffline.addEventListener('click', e => { if (e.target.classList.contains('tab')) { deactivateAll(); e.target.classList.add('active'); switch (e.target.dataset.state) { case 'offline-send': demoOfflineSend(); break; case 'offline-idle': demoOfflineIdle(); break; case 'offline-recover': demoOfflineRecover(); break; } } });
+
+  demoFlowFull();
+</script>
+</body>
+</html>
